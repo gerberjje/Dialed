@@ -16,7 +16,7 @@ public:
   void setSwapBytes(bool value) {
     swapped = value;
   }
-  void pushImage(int x, int y, int width, int height, const uint16_t *pixels) {
+  void pushImage(int x, int y, int width, int height, const uint16_t* pixels) {
     bands.push_back({x, y, width, height, pixels[0], swapped});
   }
 };

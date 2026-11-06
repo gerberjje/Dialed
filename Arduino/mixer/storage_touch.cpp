@@ -33,7 +33,7 @@ void storageYield() {
   // display bands. The worker also yields after each small FAT batch.
   taskYIELD();
 }
-static void countFreeSpace(void *) {
+static void countFreeSpace(void*) {
   for (;;) {
     bool pending;
     {
@@ -41,7 +41,7 @@ static void countFreeSpace(void *) {
       pending = freeScan.pending();
       for (int batch = 0; pending && batch < 2 && freeScan.pending(); ++batch)
         freeScan.step(
-            [](uint32_t cluster, uint32_t *value) { return sd.vol()->dbgFat(cluster, value); });
+            [](uint32_t cluster, uint32_t* value) { return sd.vol()->dbgFat(cluster, value); });
     }
     // Release the shared filesystem after two FAT sectors; rendering, uploads and
     // serial queries never wait for the entire scan. All mutations restart it.
@@ -86,23 +86,23 @@ bool DialedStorage::begin() {
   }
   return ready;
 }
-bool DialedStorage::exists(const char *p) {
+bool DialedStorage::exists(const char* p) {
   StorageGuard guard;
   return sdOK ? sd.exists(p) : LittleFS.exists(p);
 }
-bool DialedStorage::remove(const char *p) {
+bool DialedStorage::remove(const char* p) {
   StorageGuard guard;
   if (sdOK)
     storageWritten();
   return sdOK ? sd.remove(p) : LittleFS.remove(p);
 }
-bool DialedStorage::rename(const char *a, const char *b) {
+bool DialedStorage::rename(const char* a, const char* b) {
   StorageGuard guard;
   if (sdOK)
     storageWritten();
   return sdOK ? sd.rename(a, b) : LittleFS.rename(a, b);
 }
-StorageFile DialedStorage::open(const char *p, const char *mode) {
+StorageFile DialedStorage::open(const char* p, const char* mode) {
   StorageGuard guard;
   if (sdOK && (mode[0] == 'w' || mode[0] == 'a'))
     storageWritten();

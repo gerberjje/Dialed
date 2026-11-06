@@ -14,7 +14,7 @@ struct File {
   explicit operator bool() {
     return bool(data);
   }
-  int read(uint8_t *buffer, size_t length) {
+  int read(uint8_t* buffer, size_t length) {
     maxReadRequest = std::max(maxReadRequest, length);
     if (!data)
       return -1;
@@ -24,7 +24,7 @@ struct File {
     bytesRead += count;
     return int(count);
   }
-  size_t write(const uint8_t *buffer, size_t length) {
+  size_t write(const uint8_t* buffer, size_t length) {
     if (!data)
       return 0;
     data->resize(std::max(data->size(), position + length));

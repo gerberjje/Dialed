@@ -6,14 +6,17 @@
 #include <sstream>
 #include <iomanip>
 inline unsigned long testTime = 0;
-template <class T> T min(T a, T b) {
+template <class T>
+T min(T a, T b) {
   return a < b ? a : b;
 }
 inline unsigned long millis() {
   return testTime;
 }
-template <class T> T constrain(T v, T lo, T hi) {
-  return v < lo ? lo : v > hi ? hi : v;
+template <class T>
+T constrain(T v, T lo, T hi) {
+  return v < lo ? lo : v > hi ? hi
+                              : v;
 }
 inline long map(long v, long a, long b, long c, long d) {
   return (v - a) * (d - c) / (b - a) + c;
@@ -32,16 +35,18 @@ struct TestSerial {
   }
   void begin(int) {
   }
-  template <class T> void print(T v) {
+  template <class T>
+  void print(T v) {
     std::ostringstream s;
     s << v;
     output += s.str();
   }
-  void println(const char *v) {
+  void println(const char* v) {
     print(v);
     output += '\n';
   }
-  template <class T> void println(T v) {
+  template <class T>
+  void println(T v) {
     print(v);
     output += '\n';
   }

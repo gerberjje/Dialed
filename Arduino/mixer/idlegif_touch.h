@@ -12,11 +12,11 @@ class TFT_eSPI;
 
 // Mount selected storage and load any previously stored GIF. `display` is retained for
 // rendering during playback. Call once from displaySetup().
-void idleGifInit(TFT_eSPI *display);
+void idleGifInit(TFT_eSPI* display);
 
 // Handle one "gif:*" upload-protocol line. Returns true if the line was consumed
 // (so the caller can stop trying other handlers).
-bool idleGifHandleLine(const char *line);
+bool idleGifHandleLine(const char* line);
 
 // True when a valid GIF is stored and ready to play.
 bool idleGifAvailable();

@@ -47,7 +47,7 @@ inline int touchActionAt(int x, int y, bool discord) {
 
 // Same center/sweep as display.cpp: 0% bottom-left, 50% top, 100% bottom-right.
 // The interior and bottom gap are not volume controls.
-inline bool touchArcValue(int x, int y, float &value) {
+inline bool touchArcValue(int x, int y, float& value) {
   const float dx = x - 200.0f, dy = y - 111.0f;
   const float radiusSquared = dx * dx + dy * dy;
   if (radiusSquared < 45 * 45 || radiusSquared > 82 * 82)

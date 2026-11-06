@@ -5,7 +5,9 @@
 #include <Arduino.h>
 
 namespace {
-enum class Color { Off, Red, Green };
+enum class Color { Off,
+                   Red,
+                   Green };
 bool initialized = false;
 bool connected = false;
 bool screenOn = false;
@@ -15,7 +17,8 @@ void update() {
   if (!initialized)
     return;
 
-  const Color next = !screenOn ? Color::Off : connected ? Color::Green : Color::Red;
+  const Color next = !screenOn ? Color::Off : connected ? Color::Green
+                                                        : Color::Red;
   if (next == shown)
     return;
 

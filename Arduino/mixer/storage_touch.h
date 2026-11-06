@@ -8,8 +8,8 @@ class StorageGuard {
 public:
   StorageGuard();
   ~StorageGuard();
-  StorageGuard(const StorageGuard &) = delete;
-  StorageGuard &operator=(const StorageGuard &) = delete;
+  StorageGuard(const StorageGuard&) = delete;
+  StorageGuard& operator=(const StorageGuard&) = delete;
 };
 void storageWritten();
 void storageYield();
@@ -20,12 +20,12 @@ public:
   File32 card;
   bool onSD = false;
   StorageFile() = default;
-  StorageFile(const StorageFile &) = delete;
-  StorageFile &operator=(const StorageFile &) = delete;
-  StorageFile(StorageFile &&other) {
+  StorageFile(const StorageFile&) = delete;
+  StorageFile& operator=(const StorageFile&) = delete;
+  StorageFile(StorageFile&& other) {
     *this = std::move(other);
   }
-  StorageFile &operator=(StorageFile &&other) {
+  StorageFile& operator=(StorageFile&& other) {
     if (this == &other)
       return *this;
     StorageGuard guard;
@@ -42,7 +42,7 @@ public:
     StorageGuard guard;
     return onSD ? bool(card) : bool(flash);
   }
-  int read(uint8_t *b, size_t n) {
+  int read(uint8_t* b, size_t n) {
     if (!onSD) {
       StorageGuard guard;
       return flash.read(b, n);
@@ -64,7 +64,7 @@ public:
     }
     return int(total);
   }
-  size_t write(const uint8_t *b, size_t n) {
+  size_t write(const uint8_t* b, size_t n) {
     StorageGuard guard;
     if (onSD)
       storageWritten();
@@ -92,10 +92,10 @@ public:
   bool isSD() const {
     return sdOK;
   }
-  bool exists(const char *path);
-  bool remove(const char *path);
-  bool rename(const char *from, const char *to);
-  StorageFile open(const char *path, const char *mode);
+  bool exists(const char* path);
+  bool remove(const char* path);
+  bool rename(const char* from, const char* to);
+  StorageFile open(const char* path, const char* mode);
   uint64_t freeBytes();
   bool freeBytesKnown();
   bool freeSpaceFailed();

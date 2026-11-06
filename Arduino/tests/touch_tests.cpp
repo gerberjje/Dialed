@@ -24,7 +24,7 @@ bool wake() {
   return result;
 }
 int checks = 0;
-void check(bool ok, const char *message) {
+void check(bool ok, const char* message) {
   ++checks;
   if (!ok) {
     std::cerr << "FAIL: " << message << '\n';
@@ -49,7 +49,7 @@ void reset() {
   knobsSetActiveCount(1);
   knobsSetActiveCount(5);
   knobsSetTouchWakeCallback(wake);
-  for (bool &enabled : knobDiscordMute)
+  for (bool& enabled : knobDiscordMute)
     enabled = false;
 }
 int main() {

@@ -54,7 +54,7 @@ void knobsSetActiveCount(int count) {
   }
 }
 
-static void sendKnobEvent(const char *event) {
+static void sendKnobEvent(const char* event) {
   Serial.print("knob");
   Serial.print(selectedKnob + 1);
   Serial.print(':');
@@ -68,7 +68,7 @@ static void sendKnobValue(float value) {
   Serial.println(value, 3);
 }
 
-static bool readTouch(int &x, int &y) {
+static bool readTouch(int& x, int& y) {
   if (!touchscreen.touched())
     return false;
 

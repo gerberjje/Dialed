@@ -29,7 +29,7 @@ static int b64Val(char c) {
   return -1;
 }
 
-static int base64Decode(const char *src, uint8_t *dst, int dstLen) {
+static int base64Decode(const char* src, uint8_t* dst, int dstLen) {
   int out = 0;
   while (src[0] && src[1] && src[2] && src[3]) {
     int v0 = b64Val(src[0]), v1 = b64Val(src[1]);
@@ -49,10 +49,10 @@ static int base64Decode(const char *src, uint8_t *dst, int dstLen) {
 
 // Parse "assign:knob1:RRGGBB:<a|s|m>:AppName". The older format without a
 // kind field remains accepted for compatibility.
-bool handleAssignLine(const char *line) {
+bool handleAssignLine(const char* line) {
   if (strncmp(line, "assign:", 7) != 0)
     return false;
-  const char *p = line + 7; // "knob1:RRGGBB:AppName"
+  const char* p = line + 7; // "knob1:RRGGBB:AppName"
   if (strncmp(p, "knob", 4) != 0)
     return false;
 
@@ -60,11 +60,11 @@ bool handleAssignLine(const char *line) {
   if (idx < 0 || idx >= MAX_KNOBS)
     return false;
 
-  const char *c1 = strchr(p, ':'); // after "knobN"
+  const char* c1 = strchr(p, ':'); // after "knobN"
   if (!c1)
     return false;
-  const char *colorStr = c1 + 1;          // "RRGGBB:AppName"
-  const char *c2 = strchr(colorStr, ':'); // after color
+  const char* colorStr = c1 + 1;          // "RRGGBB:AppName"
+  const char* c2 = strchr(colorStr, ':'); // after color
   if (!c2)
     return false;
 
@@ -77,7 +77,7 @@ bool handleAssignLine(const char *line) {
     knobColor[idx] = ((r & 0xF8) << 8) | ((g & 0xFC) << 3) | (b >> 3);
   }
 
-  const char *label = c2 + 1;
+  const char* label = c2 + 1;
   if (label[0] && label[1] == ':') {
     knobKind[idx] = label[0] == 'm'   ? KNOB_KIND_MIC
                     : label[0] == 's' ? KNOB_KIND_SYSTEM
@@ -103,11 +103,11 @@ bool handleAssignLine(const char *line) {
 }
 
 // Parse "icon:knob1:<base64>"
-bool handleIconLine(const char *line) {
+bool handleIconLine(const char* line) {
   if (strncmp(line, "icon:", 5) != 0)
     return false;
-  const char *rest = line + 5; // "knob1:<base64>"
-  const char *colon = strchr(rest, ':');
+  const char* rest = line + 5; // "knob1:<base64>"
+  const char* colon = strchr(rest, ':');
   if (!colon || strncmp(rest, "knob", 4) != 0)
     return false;
 
@@ -115,7 +115,7 @@ bool handleIconLine(const char *line) {
   if (idx < 0 || idx >= MAX_KNOBS)
     return false;
 
-  int decoded = base64Decode(colon + 1, (uint8_t *)iconCache, ICON_PIXELS * 2);
+  int decoded = base64Decode(colon + 1, (uint8_t*)iconCache, ICON_PIXELS * 2);
   knobHasIcon[idx] = false;
   cachedIcon = -1;
   if (decoded == ICON_PIXELS * 2 && storageOK) {
@@ -123,7 +123,7 @@ bool handleIconLine(const char *line) {
     snprintf(path, sizeof(path), "/icon%d.bin", idx);
     auto f = mediaStorage.open(path, "w");
     if (f)
-      knobHasIcon[idx] = f.write((uint8_t *)iconCache, sizeof(iconCache)) == sizeof(iconCache);
+      knobHasIcon[idx] = f.write((uint8_t*)iconCache, sizeof(iconCache)) == sizeof(iconCache);
     f.close();
     if (knobHasIcon[idx])
       cachedIcon = idx;
@@ -134,10 +134,10 @@ bool handleIconLine(const char *line) {
 // Parse "outset:<a|b>:<h|s>:<DeviceName>"
 // Note the guard order: "out:" cannot reach here because its 4th char is ':'
 // while this line's is 's', so the two prefixes never collide.
-bool handleOutSetLine(const char *line) {
+bool handleOutSetLine(const char* line) {
   if (strncmp(line, "outset:", 7) != 0)
     return false;
-  const char *p = line + 7; // "<a|b>:<h|s>:<Name>"
+  const char* p = line + 7; // "<a|b>:<h|s>:<Name>"
 
   int pos;
   if (p[0] == 'a' || p[0] == 'A')
@@ -149,7 +149,7 @@ bool handleOutSetLine(const char *line) {
   if (p[1] != ':')
     return false;
 
-  const char *kindStr = p + 2; // "<h|s>:<Name>"
+  const char* kindStr = p + 2; // "<h|s>:<Name>"
   if (kindStr[0] == '\0' || kindStr[1] != ':')
     return false;
   outKind[pos] = (kindStr[0] == 'h' || kindStr[0] == 'H') ? OUT_KIND_HEADPHONE : OUT_KIND_SPEAKER;
@@ -159,7 +159,7 @@ bool handleOutSetLine(const char *line) {
   return true;
 }
 
-const uint16_t *assignmentIcon(int index) {
+const uint16_t* assignmentIcon(int index) {
   if (index < 0 || index >= MAX_KNOBS)
     return iconCache;
   if (cachedIcon != index) {
@@ -167,7 +167,7 @@ const uint16_t *assignmentIcon(int index) {
     char path[24];
     snprintf(path, sizeof(path), "/icon%d.bin", index);
     auto f = mediaStorage.open(path, "r");
-    if (!f || f.read((uint8_t *)iconCache, sizeof(iconCache)) != sizeof(iconCache)) {
+    if (!f || f.read((uint8_t*)iconCache, sizeof(iconCache)) != sizeof(iconCache)) {
       memset(iconCache, 0, sizeof(iconCache));
       knobHasIcon[index] = false;
     }
@@ -181,12 +181,12 @@ void assignmentsInit() {
 }
 // A named device snapshot; PC application/session mappings remain owned by Windows.
 // Icons are included so changing assignments cannot corrupt saved snapshots.
-bool assignmentsHandleProfile(const char *line) {
+bool assignmentsHandleProfile(const char* line) {
   bool save = strncmp(line, "profile:save:", 13) == 0;
   bool load = strncmp(line, "profile:load:", 13) == 0;
   if (!save && !load)
     return false;
-  const char *name = line + 13;
+  const char* name = line + 13;
   size_t n = strlen(name);
   if (!storageOK || n == 0 || n > 24) {
     Serial.println("profile:err");
@@ -227,14 +227,14 @@ bool assignmentsHandleProfile(const char *line) {
         hash = (hash ^ bytes[j]) * 16777619u;
       remaining -= count;
     }
-    ok = ok && f.read((uint8_t *)&stored, 4) == 4 && hash == stored && f.seek(4);
+    ok = ok && f.read((uint8_t*)&stored, 4) == 4 && hash == stored && f.seek(4);
   }
-#define FIELD(x)                                                                                   \
-  if (ok) {                                                                                        \
-    if (save)                                                                                      \
-      ok = f.write((const uint8_t *)x, sizeof(x)) == sizeof(x);                                    \
-    else                                                                                           \
-      ok = f.read((uint8_t *)x, sizeof(x)) == sizeof(x);                                           \
+#define FIELD(x)                                               \
+  if (ok) {                                                    \
+    if (save)                                                  \
+      ok = f.write((const uint8_t*)x, sizeof(x)) == sizeof(x); \
+    else                                                       \
+      ok = f.read((uint8_t*)x, sizeof(x)) == sizeof(x);        \
   }
   FIELD(knobLabel);
   FIELD(knobColor);
@@ -246,17 +246,17 @@ bool assignmentsHandleProfile(const char *line) {
   for (int i = 0; ok && i < MAX_KNOBS; i++) {
     uint8_t present = knobHasIcon[i] ? 1 : 0;
     if (save) {
-      const uint16_t *pixels = assignmentIcon(i);
+      const uint16_t* pixels = assignmentIcon(i);
       ok = f.write(&present, 1) == 1 &&
-           f.write((const uint8_t *)pixels, sizeof(iconCache)) == sizeof(iconCache);
+           f.write((const uint8_t*)pixels, sizeof(iconCache)) == sizeof(iconCache);
     } else {
       ok = f.read(&present, 1) == 1 &&
-           f.read((uint8_t *)iconCache, sizeof(iconCache)) == sizeof(iconCache);
+           f.read((uint8_t*)iconCache, sizeof(iconCache)) == sizeof(iconCache);
       char iconPath[24];
       snprintf(iconPath, sizeof(iconPath), "/icon%d.bin", i);
       auto icon = mediaStorage.open(iconPath, "w");
       ok = ok && bool(icon) &&
-           icon.write((uint8_t *)iconCache, sizeof(iconCache)) == sizeof(iconCache);
+           icon.write((uint8_t*)iconCache, sizeof(iconCache)) == sizeof(iconCache);
       icon.close();
       knobHasIcon[i] = ok && present;
     }
@@ -278,7 +278,7 @@ bool assignmentsHandleProfile(const char *line) {
     }
     check.close();
     auto append = mediaStorage.open(temp, "a");
-    ok = ok && bool(append) && append.write((uint8_t *)&hash, 4) == 4;
+    ok = ok && bool(append) && append.write((uint8_t*)&hash, 4) == 4;
     append.close();
     if (!ok) {
       Serial.println("profile:err");

@@ -13,7 +13,7 @@ void setPcConnectionStatus(bool connected) {
     connectionDirty = true;
   }
 }
-void drawStorageStatus(TFT_eSPI &d, uint16_t bg, uint16_t fg, bool force) {
+void drawStorageStatus(TFT_eSPI& d, uint16_t bg, uint16_t fg, bool force) {
   static unsigned long updated = 0, painted = 0;
   static char text[54] = {};
   unsigned long now = millis();

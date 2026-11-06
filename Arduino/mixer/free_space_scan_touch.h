@@ -16,7 +16,8 @@ public:
     complete = false;
     error = false;
   }
-  template <class Reader> void step(Reader read) {
+  template <class Reader>
+  void step(Reader read) {
     if (complete || error)
       return;
     const uint32_t end = total + 2;

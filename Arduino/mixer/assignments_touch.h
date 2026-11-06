@@ -7,12 +7,14 @@ static const int ICON_H = 64;
 static const int ICON_PIXELS = ICON_W * ICON_H;
 
 extern char knobLabel[MAX_KNOBS][32];
-const uint16_t *assignmentIcon(int index);
+const uint16_t* assignmentIcon(int index);
 void assignmentsInit();
-bool assignmentsHandleProfile(const char *line);
+bool assignmentsHandleProfile(const char* line);
 extern bool knobHasIcon[MAX_KNOBS];
 extern uint16_t knobColor[MAX_KNOBS]; // accent color, RGB565
-enum KnobKind : uint8_t { KNOB_KIND_APP = 0, KNOB_KIND_SYSTEM = 1, KNOB_KIND_MIC = 2 };
+enum KnobKind : uint8_t { KNOB_KIND_APP = 0,
+                          KNOB_KIND_SYSTEM = 1,
+                          KNOB_KIND_MIC = 2 };
 extern uint8_t knobKind[MAX_KNOBS];
 extern bool knobDiscordMute[MAX_KNOBS];
 
@@ -27,6 +29,6 @@ static const uint8_t OUT_KIND_HEADPHONE = 1;
 extern char outLabel[OUT_POSITIONS][32];
 extern uint8_t outKind[OUT_POSITIONS];
 
-bool handleAssignLine(const char *line);
-bool handleIconLine(const char *line);
-bool handleOutSetLine(const char *line);
+bool handleAssignLine(const char* line);
+bool handleIconLine(const char* line);
+bool handleOutSetLine(const char* line);

@@ -1,7 +1,7 @@
 #include <cstdlib>
 #include <iostream>
 #include "../mixer/idle_media_profile.h"
-void check(bool ok, const char *name) {
+void check(bool ok, const char* name) {
   if (!ok) {
     std::cerr << name << '\n';
     std::exit(1);

@@ -24,19 +24,10 @@ public class AppSettings
     public bool ShowPercentSign { get; set; } = false;
     public bool ShowDiscordStatus { get; set; } = true;
     public List<IdleGifConfig> IdleGifs { get; set; } = new();
-    public string? ActiveIdleGifId
-    {
-        get; set;
-    }
+    public string? ActiveIdleGifId { get; set; }
 
     // The two playback endpoints the hardware output switch toggles between.
     // Stored as Core Audio device ids (GUID strings); null until assigned.
-    public string? OutputDeviceAId
-    {
-        get; set;
-    }
-    public string? OutputDeviceBId
-    {
-        get; set;
-    }
+    public string? OutputDeviceAId { get; set; }
+    public string? OutputDeviceBId { get; set; }
 }

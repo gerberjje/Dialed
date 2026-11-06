@@ -12,7 +12,7 @@ static bool blankMode =
 #include <TFT_eSPI.h>
 #include <math.h>
 
-#if !defined(ILI9341_2_DRIVER) || TFT_MISO != 12 || TFT_MOSI != 13 || TFT_SCLK != 14 ||            \
+#if !defined(ILI9341_2_DRIVER) || TFT_MISO != 12 || TFT_MOSI != 13 || TFT_SCLK != 14 || \
     TFT_CS != 15 || TFT_DC != 2 || TFT_BL != 21
 #error "Install mixer/User_Setup_touch.h in TFT_eSPI before compiling."
 #endif
@@ -27,7 +27,9 @@ constexpr uint16_t YELLOW = 0xEFEB, DIM = 0x7C92;
 constexpr int BODY_Y = 38, BODY_H = 160;
 constexpr unsigned long FRAME_MS = 33, TRANSITION_MS = 180;
 constexpr float PI2 = 6.283185307f;
-enum Screen { ACTIVE, IDLE, OUTPUT_CARD };
+enum Screen { ACTIVE,
+              IDLE,
+              OUTPUT_CARD };
 Screen screen = IDLE;
 int selected = 0, pressed = 0, outputPos = 0;
 uint8_t outputState = OUT_PENDING;
@@ -55,7 +57,7 @@ uint16_t mix(uint16_t color, float opacity) {
 
 // One reusable body sprite, 102,400 bytes at 16-bit; try 8-bit if RAM is tight.
 // Direct drawing is the last fallback. No full-screen clears during animation.
-TFT_eSPI &beginBody() {
+TFT_eSPI& beginBody() {
   if (buffered) {
     body.fillSprite(BG);
     return body;
@@ -70,14 +72,14 @@ void endBody() {
   else
     tft.resetViewport();
 }
-void label(TFT_eSPI &d, const char *text, int x, int y, uint16_t color, int font = 2) {
+void label(TFT_eSPI& d, const char* text, int x, int y, uint16_t color, int font = 2) {
   d.setTextFont(font);
   d.setTextSize(1);
   d.setTextDatum(MC_DATUM);
   d.setTextColor(color, BG);
   d.drawString(text, x, y);
 }
-void fitted(TFT_eSPI &d, const char *text, int x, int y, int width, uint16_t color) {
+void fitted(TFT_eSPI& d, const char* text, int x, int y, int width, uint16_t color) {
   d.setTextFont(2);
   d.setTextSize(1);
   char buf[32];
@@ -96,7 +98,7 @@ void fitted(TFT_eSPI &d, const char *text, int x, int y, int width, uint16_t col
   }
   label(d, buf, x, y, color);
 }
-void speaker(TFT_eSPI &d, int x, int y, uint16_t color, bool slash) {
+void speaker(TFT_eSPI& d, int x, int y, uint16_t color, bool slash) {
   d.fillRect(x - 18, y - 6, 10, 12, color);
   d.fillTriangle(x - 8, y - 6, x + 5, y - 17, x + 5, y + 17, color);
   if (slash) {
@@ -109,7 +111,7 @@ void speaker(TFT_eSPI &d, int x, int y, uint16_t color, bool slash) {
     d.drawLine(x + 17, y + 4, x + 11, y + 10, color);
   }
 }
-void channelIcon(TFT_eSPI &d, float opacity) {
+void channelIcon(TFT_eSPI& d, float opacity) {
   const int x = 24, y = 37, size = 48;
   if (knobHasIcon[selected]) {
     uint16_t row[size];
@@ -136,7 +138,7 @@ void channelIcon(TFT_eSPI &d, float opacity) {
   } else
     speaker(d, 48, 62, mix(CYAN, opacity), false);
 }
-void arc(TFT_eSPI &d, int cx, int cy, int radius, int pct, uint16_t color, float opacity) {
+void arc(TFT_eSPI& d, int cx, int cy, int radius, int pct, uint16_t color, float opacity) {
   const int lit = (pct * 30 + 50) / 100;
   for (int i = 0; i < 30; ++i)
     d.drawSmoothArc(cx, cy, radius, radius - 9, 45 + i * 9, 52 + i * 9,
@@ -157,7 +159,7 @@ void chrome() {
       tft.drawNumber(i + 1, x + 29, 18);
     }
     const bool discord = knobDiscordMute[selected];
-    const char *labels[] = {"-", muted[selected] ? "UNMUTE" : "MUTE", "+"};
+    const char* labels[] = {"-", muted[selected] ? "UNMUTE" : "MUTE", "+"};
     for (int i = 0; i < touchActionCount(discord); ++i) {
       const int action = touchActionId(i, discord);
       uint16_t col = action == 2   ? PINK
@@ -187,13 +189,15 @@ void chrome() {
   }
   chromeDirty = false;
 }
-void discordIndicators(TFT_eSPI &d, unsigned long now, float alpha) {
+void discordIndicators(TFT_eSPI& d, unsigned long now, float alpha) {
   const bool fresh = discordFresh(selected, now);
   const int states[] = {fresh ? discordMuted[selected] : -1,
                         fresh ? discordDeafened[selected] : -1};
   for (int i = 0; i < 2; ++i) {
     const int x = touchDiscordIconX(i), y = TOUCH_DISCORD_ICON_Y - BODY_Y;
-    uint16_t color = mix(states[i] < 0 ? DIM : states[i] ? PINK : WHITE, alpha);
+    uint16_t color = mix(states[i] < 0 ? DIM : states[i] ? PINK
+                                                         : WHITE,
+                         alpha);
     d.fillRoundRect(x - 19, y - 16, 38, 32, 7, mix(SURFACE, alpha));
     d.drawRoundRect(x - 20, y - 17, 40, 34, 8, mix(pressed == 4 + i ? YELLOW : TRACK, alpha));
     if (i == 0) {
@@ -217,7 +221,7 @@ void discordIndicators(TFT_eSPI &d, unsigned long now, float alpha) {
   renderedDiscordFresh = fresh;
 }
 void activeFrame(unsigned long now) {
-  TFT_eSPI &d = beginBody();
+  TFT_eSPI& d = beginBody();
   float alpha =
       transitioning ? constrain((now - transitionStart) / (float)TRANSITION_MS, 0.0f, 1.0f) : 1.0f;
   alpha = 1.0f - (1.0f - alpha) * (1.0f - alpha);
@@ -297,7 +301,7 @@ void idleFrame(unsigned long now) {
   }
 }
 void outputFrame() {
-  TFT_eSPI &d = beginBody();
+  TFT_eSPI& d = beginBody();
   for (int i = 0; i < 2; ++i) {
     int x = 8 + i * 158;
     uint16_t color = i == outputPos ? (outputState == OUT_OK        ? CYAN
@@ -319,7 +323,7 @@ void outputFrame() {
   dirty = false;
 }
 void uploadFrame() {
-  TFT_eSPI &d = beginBody();
+  TFT_eSPI& d = beginBody();
   arc(d, 160, 75, 65, uploadPct, uploadFinished && !uploadOk ? PINK : CYAN, 1);
   char value[5];
   snprintf(value, sizeof(value), "%d", uploadPct);

@@ -13,8 +13,8 @@ static const int MAX_GIF_FRAMES = 64;
 static const int PANEL_W = 320;
 static const int PANEL_H = 240;
 static const int BAND_ROWS = IDLE_MEDIA_BAND_ROWS;
-static const char *DATA_PATH = "/idle.dat";
-static const char *TMP_PATH = "/idle.tmp";
+static const char* DATA_PATH = "/idle.dat";
+static const char* TMP_PATH = "/idle.tmp";
 
 // On-disk layout of DATA_PATH:
 //   [0..3]  magic 'G','I','D','1'
@@ -26,7 +26,7 @@ static const char *TMP_PATH = "/idle.tmp";
 static const int HEADER_BYTES = 10;
 
 // ── State ───────────────────────────────────────────────────────────────────
-static TFT_eSPI *tft = nullptr;
+static TFT_eSPI* tft = nullptr;
 static bool fsOk = false;
 
 static bool available = false;
@@ -69,7 +69,7 @@ static int b64Val(char c) {
   return -1;
 }
 
-static int base64Decode(const char *src, uint8_t *dst, int dstLen) {
+static int base64Decode(const char* src, uint8_t* dst, int dstLen) {
   int out = 0;
   while (src[0] && src[1] && src[2] && src[3]) {
     int v0 = b64Val(src[0]), v1 = b64Val(src[1]);
@@ -130,7 +130,7 @@ static bool loadHeader() {
 }
 
 // ── Public: init ────────────────────────────────────────────────────────────
-void idleGifInit(TFT_eSPI *display) {
+void idleGifInit(TFT_eSPI* display) {
   tft = display;
   fsOk = mediaStorage.begin(); // SD preferred; never automatically format
   if (fsOk)
@@ -167,7 +167,7 @@ static void handleSpaceQuery() {
   Serial.println((long)min(free, uint64_t(LONG_MAX)));
 }
 
-static void handleBegin(const char *line) {
+static void handleBegin(const char* line) {
   if (!fsOk) {
     Serial.println("gif:err");
     return;
@@ -182,8 +182,8 @@ static void handleBegin(const char *line) {
   if (mediaStorage.exists(DATA_PATH))
     mediaStorage.remove(DATA_PATH);
 
-  const char *p = line + 10; // past "gif:begin:"
-  char *end;
+  const char* p = line + 10; // past "gif:begin:"
+  char* end;
   long count = strtol(p, &end, 10);
   if (*end != ':') {
     Serial.println("gif:err");
@@ -261,7 +261,7 @@ static void handleBegin(const char *line) {
   Serial.println("gif:rdy");
 }
 
-static void handleData(const char *line) {
+static void handleData(const char* line) {
   if (!uploading) {
     Serial.println("gif:err");
     return;
@@ -324,7 +324,7 @@ static void handleClear() {
   Serial.println("gif:cleared");
 }
 
-bool idleGifHandleLine(const char *line) {
+bool idleGifHandleLine(const char* line) {
   if (strncmp(line, "gif:", 4) != 0)
     return false;
 
@@ -365,7 +365,7 @@ static void drawFrameBand() {
   int y0 = (PANEL_H - gifH) / 2;
   int rows = (gifH - nextRow < BAND_ROWS) ? gifH - nextRow : BAND_ROWS;
   size_t bytes = (size_t)rows * gifW * 2;
-  if (playFile.read((uint8_t *)bandBuf, bytes) != int(bytes)) {
+  if (playFile.read((uint8_t*)bandBuf, bytes) != int(bytes)) {
     framePending = false;
     return;
   }

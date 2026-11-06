@@ -4,7 +4,7 @@
 #include "../mixer/idlegif_touch.cpp"
 
 int checks = 0, lockDepth = 0, yields = 0;
-void check(bool ok, const char *message) {
+void check(bool ok, const char* message) {
   ++checks;
   if (!ok) {
     std::cerr << message << '\n';
@@ -29,20 +29,20 @@ bool DialedStorage::begin() {
   sdOK = ready = true;
   return true;
 }
-bool DialedStorage::exists(const char *path) {
+bool DialedStorage::exists(const char* path) {
   return files.count(path);
 }
-bool DialedStorage::remove(const char *path) {
+bool DialedStorage::remove(const char* path) {
   return files.erase(path);
 }
-bool DialedStorage::rename(const char *from, const char *to) {
+bool DialedStorage::rename(const char* from, const char* to) {
   if (!files.count(from))
     return false;
   files[to] = files[from];
   files.erase(from);
   return true;
 }
-StorageFile DialedStorage::open(const char *path, const char *mode) {
+StorageFile DialedStorage::open(const char* path, const char* mode) {
   if (mode[0] == 'w')
     files[path] = std::make_shared<std::vector<uint8_t>>();
   StorageFile f;

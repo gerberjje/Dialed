@@ -2,7 +2,7 @@
 
 // Retained as the input boundary. Touch events use the same wire protocol as
 // rotary encoders and are echoed back by the PC.
-typedef void (*KnobCallback)(const char *id, float value);
+typedef void (*KnobCallback)(const char* id, float value);
 
 void knobsSetup(KnobCallback cb);
 void knobsLoop();

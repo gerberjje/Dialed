@@ -6,7 +6,7 @@ float lastVolume = -1;
 bool lastMute = false, blanked = false;
 int configuredCount = -1, gifTicks = 0, assignmentUpdates = 0;
 bool gifConsumed = false;
-void check(bool ok, const char *message) {
+void check(bool ok, const char* message) {
   ++checks;
   if (!ok) {
     std::cerr << "FAIL: " << message << '\n';
@@ -45,16 +45,16 @@ void knobsSetActiveCount(int n) {
 }
 void knobsSetSwitchCallback(SwitchCallback) {
 }
-bool handleAssignLine(const char *) {
+bool handleAssignLine(const char*) {
   return false;
 }
-bool handleIconLine(const char *) {
+bool handleIconLine(const char*) {
   return false;
 }
-bool handleOutSetLine(const char *) {
+bool handleOutSetLine(const char*) {
   return false;
 }
-bool idleGifHandleLine(const char *) {
+bool idleGifHandleLine(const char*) {
   return gifConsumed;
 }
 
@@ -75,7 +75,7 @@ bool DialedStorage::freeSpaceFailed() {
 }
 void assignmentsInit() {
 }
-bool assignmentsHandleProfile(const char *) {
+bool assignmentsHandleProfile(const char*) {
   return false;
 }
 void displayAssignmentChanged() {
@@ -103,7 +103,7 @@ void knobsSetTouchWakeCallback(TouchWakeCallback) {
 }
 #endif
 
-void send(const std::string &line) {
+void send(const std::string& line) {
   Serial.input = line;
   Serial.cursor = 0;
   readIncomingSerial();

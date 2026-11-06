@@ -8,7 +8,7 @@ inline bool testContact = false;
 struct XPT2046_Touchscreen {
   XPT2046_Touchscreen(int, int) {
   }
-  void begin(SPIClass &) {
+  void begin(SPIClass&) {
   }
   void setRotation(int) {
   }
