@@ -60,7 +60,10 @@ jobs:
           "@
 
   compile:
-    name: Compile mixer (ESP32)
+    name: Compile mixer (${{ matrix.controller }}, ESP32)
+    strategy:
+      matrix:
+        controller: [mixer, touch]
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -68,11 +71,19 @@ jobs:
 
       - name: Setup Arduino toolchain
         uses: ./.github/actions/setup-arduino
+        with:
+          controller: ${{ matrix.controller }}
 
       # Compile only. The merge into a flashable image needs the Windows esptool
       # and happens in release.yml.
       - name: Compile mixer sketch
         shell: pwsh
         run: |
-          arduino-cli compile --fqbn esp32:esp32:esp32 Arduino/mixer
+          $compileArgs = @('compile', '--fqbn', 'esp32:esp32:esp32')
+          $flags = '-DDIALED_CONTROLLER_TOUCH=0'
+          if ('${{ matrix.controller }}' -eq 'touch') {
+            $flags = '-DDIALED_CONTROLLER_TOUCH=1 -DSPI_DRIVER_SELECT=2 -DMAINTAIN_FREE_CLUSTER_COUNT=1'
+          }
+          $compileArgs += @('--build-property', "compiler.cpp.extra_flags=$flags")
+          arduino-cli @compileArgs 'Arduino/mixer'
           if ($LASTEXITCODE -ne 0) { throw "arduino-cli compile failed" }

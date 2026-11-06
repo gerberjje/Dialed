@@ -178,6 +178,16 @@
                 </StackPanel>
             </Border>
 
+            <TextBlock Text="{loc:Loc Key=Discord_Settings_Title}" Style="{StaticResource SectionTitle}" Margin="0,20,0,0" />
+            <Border Style="{StaticResource Card}" Margin="0,6,0,0">
+                <StackPanel Spacing="10">
+                    <ToggleSwitch Header="{loc:Loc Key=Discord_Settings_Enable}"
+                                  IsOn="{x:Bind ViewModel.ShowDiscordStatus, Mode=TwoWay}" />
+                    <TextBlock Text="{loc:Loc Key=Discord_Settings_Help}" Style="{StaticResource FieldHelp}" />
+                    <TextBlock Text="{x:Bind ViewModel.DiscordStatusText, Mode=OneWay}" Style="{StaticResource FieldHelp}" />
+                </StackPanel>
+            </Border>
+
             <!-- ==================== Firmware ==================== -->
             <TextBlock Text="{loc:Loc Key=Settings_Firmware_Title}" Style="{StaticResource SectionTitle}" Margin="0,20,0,0" />
             <TextBlock Text="{loc:Loc Key=Settings_Firmware_Caption}"

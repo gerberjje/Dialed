@@ -202,4 +202,19 @@
   <data name="OtherApps_DisplayName_Count" xml:space="preserve"><value>Other Apps ({0})</value></data>
   <data name="OtherApps_Title" xml:space="preserve"><value>Other Apps (Catch-all)</value></data>
   <data name="OtherApps_Help" xml:space="preserve"><value>Control all apps not assigned to other knobs</value></data>
+  <!-- Touch and Discord additions -->
+  <data name="Discord_Settings_Title" xml:space="preserve"><value>Discord status</value></data>
+  <data name="Discord_Settings_Enable" xml:space="preserve"><value>Show live mute and deafen status</value></data>
+  <data name="Discord_Settings_Help" xml:space="preserve"><value>Reads Discord’s microphone and deafen switches. Keep its desktop window open. Grey icons with ? mean the controls are unavailable; no Discord account connection is required. English and Portuguese control names are supported.</value></data>
+  <data name="Discord_Status_Unknown" xml:space="preserve"><value>Status unavailable — open Discord and assign it to a channel.</value></data>
+  <data name="Discord_Status_Disabled" xml:space="preserve"><value>Discord status is disabled.</value></data>
+  <data name="Discord_Status_Live" xml:space="preserve"><value>Live: {0} · {1}</value></data>
+  <data name="Discord_Muted" xml:space="preserve"><value>Microphone muted</value></data>
+  <data name="Discord_Unmuted" xml:space="preserve"><value>Microphone on</value></data>
+  <data name="Discord_Deafened" xml:space="preserve"><value>Deafened</value></data>
+  <data name="Discord_Listening" xml:space="preserve"><value>Listening</value></data>
+  <data name="Discord_Control_Unavailable" xml:space="preserve"><value>Discord voice control unavailable — keep the Discord desktop window open.</value></data>
+  <data name="Flash_Board_Esp32Touch" xml:space="preserve"><value>ESP32 touchscreen controller</value></data>
+  <data name="Flash_Err_ControllerMismatch" xml:space="preserve"><value>The connected controller reports {0}, but the bundled firmware targets {1}. Use a firmware bundle for this controller.</value></data>
+  <data name="Gif_SpacePending" xml:space="preserve"><value>Storage free space is still being calculated. Please try uploading again shortly.</value></data>
 </root>

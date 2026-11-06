@@ -1,3 +1,5 @@
+#include "controller_profile.h"
+#if !DIALED_CONTROLLER_TOUCH
 #include "assignments.h"
 
 char     knobLabel  [MAX_KNOBS][32]          = {};
@@ -99,3 +101,4 @@ bool handleOutSetLine(const char* line) {
   outLabel[pos][31] = '\0';
   return true;
 }
+#endif

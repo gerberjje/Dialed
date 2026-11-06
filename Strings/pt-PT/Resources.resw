@@ -202,4 +202,19 @@
   <data name="OtherApps_DisplayName_Count" xml:space="preserve"><value>Outras aplica??es ({0})</value></data>
   <data name="OtherApps_Title" xml:space="preserve"><value>Outras aplica??es (restantes)</value></data>
   <data name="OtherApps_Help" xml:space="preserve"><value>Controlar todas as aplica??es n?o atribu?das a outros controlos</value></data>
+  <!-- Touch and Discord additions -->
+  <data name="Discord_Settings_Title" xml:space="preserve"><value>Estado do Discord</value></data>
+  <data name="Discord_Settings_Enable" xml:space="preserve"><value>Mostrar o estado de silêncio e áudio em tempo real</value></data>
+  <data name="Discord_Settings_Help" xml:space="preserve"><value>Lê os controlos de microfone e áudio do Discord. Mantenha a janela da aplicação aberta. Ícones cinzentos com ? indicam controlos indisponíveis; não é necessário ligar a conta Discord. São suportados os nomes dos controlos em inglês e português.</value></data>
+  <data name="Discord_Status_Unknown" xml:space="preserve"><value>Estado indisponível — abra o Discord e atribua-o a um canal.</value></data>
+  <data name="Discord_Status_Disabled" xml:space="preserve"><value>O estado do Discord está desativado.</value></data>
+  <data name="Discord_Status_Live" xml:space="preserve"><value>Em tempo real: {0} · {1}</value></data>
+  <data name="Discord_Muted" xml:space="preserve"><value>Microfone silenciado</value></data>
+  <data name="Discord_Unmuted" xml:space="preserve"><value>Microfone ativo</value></data>
+  <data name="Discord_Deafened" xml:space="preserve"><value>Áudio desativado</value></data>
+  <data name="Discord_Listening" xml:space="preserve"><value>Áudio ativo</value></data>
+  <data name="Discord_Control_Unavailable" xml:space="preserve"><value>Controlo do microfone indisponível — mantenha a janela do Discord aberta.</value></data>
+  <data name="Flash_Board_Esp32Touch" xml:space="preserve"><value>Controlador ESP32 com ecrã tátil</value></data>
+  <data name="Flash_Err_ControllerMismatch" xml:space="preserve"><value>O controlador ligado indica {0}, mas o firmware incluído destina-se a {1}. Utilize um pacote de firmware para este controlador.</value></data>
+  <data name="Gif_SpacePending" xml:space="preserve"><value>O espaço livre de armazenamento ainda está a ser calculado. Tente enviar novamente dentro de momentos.</value></data>
 </root>

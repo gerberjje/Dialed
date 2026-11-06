@@ -1,0 +1,56 @@
+using System.Drawing;
+using System.Drawing.Imaging;
+using Dialed.Core.Services;
+
+int checks = 0;
+void Check(bool passed, string name)
+{
+    checks++;
+    if (!passed) throw new Exception(name);
+}
+ushort Pixel(EncodedGif image, int x, int y)
+{
+    int offset = (y * image.Width + x) * 2;
+    return (ushort)(image.Frames[0].Rgb565[offset] | image.Frames[0].Rgb565[offset + 1] << 8);
+}
+var directory = Path.Combine(Path.GetTempPath(), "dialed-encoder-" + Guid.NewGuid().ToString("N"));
+Directory.CreateDirectory(directory);
+try
+{
+    foreach (var size in new[] { (320, 240), (240, 320), (240, 240) })
+    {
+        var path = Path.Combine(directory, $"{size.Item1}x{size.Item2}.png");
+        using (var image = new Bitmap(size.Item1, size.Item2))
+        {
+            using var graphics = Graphics.FromImage(image);
+            graphics.Clear(Color.Lime);
+            graphics.FillRectangle(Brushes.Red, 0, 0, 40, image.Height);
+            graphics.FillRectangle(Brushes.Blue, image.Width - 40, 0, 40, image.Height);
+            image.Save(path, ImageFormat.Png);
+        }
+        var square = GifFrameEncoder.Encode(path, 240, 60, 20);
+        var explicitSquare = GifFrameEncoder.Encode(path, 240, 240, 60, 20);
+        Check(square.Width == 240 && square.Height == 240, "legacy dimensions preserved");
+        Check(square.Frames[0].Rgb565.Length == 115200, "legacy payload size preserved");
+        Check(square.Frames[0].Rgb565.SequenceEqual(explicitSquare.Frames[0].Rgb565), "square overload parity");
+        Check(Pixel(square,120,120) == 0x07E0, "square center remains centered");
+        var wide = GifFrameEncoder.Encode(path, 320, 240, 60, 20);
+        Check(wide.Width == 320 && wide.Height == 240, "native rectangular dimensions");
+        Check(wide.Frames[0].Rgb565.Length == 153600, "rectangular payload size");
+        Check(Pixel(wide,20,120) == 0xF800 && Pixel(wide,300,120) == 0x001F,
+            "landscape fill preserves horizontal edges without side borders");
+        Check(Pixel(wide,160,10) == 0x07E0 && Pixel(wide,160,230) == 0x07E0,
+            "portrait/square sources fill height without letterboxing");
+        if (size.Item1 == 320)
+            Check(Pixel(square,20,120) == 0x07E0 && Pixel(square,220,120) == 0x07E0,
+                "mixer controller retains its original square center crop");
+#if BASELINE
+        var baseline = Dialed.Tests.Baseline.GifFrameEncoder.Encode(path,240,60,20);
+        Check(square.Frames[0].Rgb565.SequenceEqual(baseline.Frames[0].Rgb565) &&
+              square.Frames[0].DelayMs == baseline.Frames[0].DelayMs,
+              "mixer output is byte-for-byte identical to the pre-change encoder");
+#endif
+    }
+    Console.WriteLine($"{checks} encoder checks passed");
+}
+finally { Directory.Delete(directory, recursive: true); }

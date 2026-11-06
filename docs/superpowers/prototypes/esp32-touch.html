@@ -1,0 +1,452 @@
+﻿<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>AudioMixer / Touch Display</title>
+    <style>
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        background: #060a10;
+        color: #f0f5fa;
+        font: 14px system-ui;
+      }
+      main {
+        max-width: 1240px;
+        margin: 40px auto;
+        padding: 0 28px;
+      }
+      h1 {
+        font-size: 26px;
+        letter-spacing: 6px;
+        font-weight: 500;
+        margin: 0 0 8px;
+      }
+      h1 span {
+        color: #00e5ff;
+      }
+      p {
+        color: #8ba3b6;
+        line-height: 1.5;
+      }
+      .screens {
+        display: grid;
+        grid-template-columns: 2fr 1fr;
+        gap: 24px;
+        margin-top: 28px;
+      }
+      .small {
+        display: grid;
+        gap: 20px;
+      }
+      canvas {
+        display: block;
+        width: 100%;
+        aspect-ratio: 4/3;
+        background: #000000;
+        border: 1px solid #23435a;
+        border-radius: 8px;
+        touch-action: none;
+      }
+      .caption {
+        margin: 8px 0;
+        font-size: 11px;
+        letter-spacing: 2px;
+        color: #8ba3b6;
+      }
+      nav {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        margin-top: 20px;
+      }
+      button {
+        background: #132033;
+        border: 1px solid #23435a;
+        border-radius: 6px;
+        padding: 10px 15px;
+        color: #00e5ff;
+        cursor: pointer;
+      }
+      button:focus-visible {
+        outline: 2px solid #e8ff58;
+      }
+      .key {
+        display: inline-block;
+        width: 10px;
+        height: 10px;
+        background: #00e5ff;
+        margin-right: 6px;
+      }
+      footer {
+        border-top: 1px solid #19304a;
+        margin-top: 24px;
+        padding-top: 16px;
+        color: #8ba3b6;
+        font-size: 12px;
+      }
+      @media (max-width: 800px) {
+        .screens {
+          grid-template-columns: 1fr;
+        }
+        .small {
+          grid-template-columns: 1fr 1fr;
+        }
+        main {
+          margin: 24px auto;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>AUDIOMIXER <span>/ TOUCH DISPLAY</span></h1>
+      <p>ESP32 touch display · 320 × 240 layout preview</p>
+      <div class="screens">
+        <section>
+          <canvas id="active" width="640" height="480" aria-label="Mixer display"></canvas>
+          <p class="caption">01 / ACTIVE — TOUCH THE ARC OR SELECT A CHANNEL</p>
+          <nav>
+            <button id="prev">Previous channel</button><button id="next">Next channel</button
+            ><button id="minus">− Volume</button><button id="mute">Mute / unmute</button
+            ><button id="plus">+ Volume</button><button id="percent">Show %</button
+            ><button id="mic">Microphone</button>
+          </nav>
+        </section>
+        <div class="small">
+          <section>
+            <canvas id="muted" width="640" height="480" aria-label="Muted display"></canvas>
+            <p class="caption">02 / MUTED — DRAWN SYMBOL, NO BITMAP</p>
+          </section>
+          <section>
+            <canvas
+              id="idle"
+              width="640"
+              height="480"
+              aria-label="Original mixer idle animation"
+            ></canvas>
+            <p class="caption">03 / IDLE — ORIGINAL BREATHING RING</p>
+          </section>
+        </div>
+      </div>
+      <footer>
+        <span class="key"></span>Cyan volume · Magenta mute · Yellow selection<br />Layout and
+        motion simulation. The firmware uses TFT fonts and RGB565 colors; physical panel
+        verification is still required.
+      </footer>
+    </main>
+    <script>
+      const BG = "#000000",
+        WHITE = "#f0f5fa",
+        CYAN = "#00e5ff",
+        PINK = "#ff2e88",
+        YELLOW = "#e8ff58",
+        DIM = "#8098aa",
+        TRACK = "#19304a";
+      const names = ["Spotify", "Discord", "Game", "System", "Microphone"];
+      let selected = 0,
+        values = [72, 45, 80, 60, 100],
+        mutes = [false, false, false, false, false],
+        shown = 72,
+        percent = false,
+        pressed = -1,
+        until = 0,
+        drag = false,
+        transition = 0;
+      const discordVoice = { muted: false, deafened: false, wasMuted: false };
+      const contexts = {};
+      for (const id of ["active", "muted", "idle"]) {
+        contexts[id] = document.getElementById(id).getContext("2d");
+        contexts[id].scale(2, 2);
+      }
+      function txt(c, s, x, y, size = 14, col = WHITE) {
+        c.font = `${size >= 30 ? "bold " : ""}${size}px Arial`;
+        c.textAlign = "center";
+        c.textBaseline = "middle";
+        c.fillStyle = col;
+        c.fillText(s, x, y);
+      }
+      function rr(c, x, y, w, h, r, fill, stroke) {
+        c.beginPath();
+        c.roundRect(x, y, w, h, r);
+        if (fill) {
+          c.fillStyle = fill;
+          c.fill();
+        }
+        if (stroke) {
+          c.strokeStyle = stroke;
+          c.lineWidth = 1;
+          c.stroke();
+        }
+      }
+      function line(c, x1, y1, x2, y2, col, w = 1) {
+        c.beginPath();
+        c.moveTo(x1, y1);
+        c.lineTo(x2, y2);
+        c.strokeStyle = col;
+        c.lineWidth = w;
+        c.stroke();
+      }
+      function speaker(c, x, y, col, slash) {
+        c.fillStyle = col;
+        c.fillRect(x - 18, y - 6, 10, 12);
+        c.beginPath();
+        c.moveTo(x - 8, y - 6);
+        c.lineTo(x + 5, y - 17);
+        c.lineTo(x + 5, y + 17);
+        c.fill();
+        if (slash) line(c, x - 21, y - 21, x + 22, y + 22, PINK, 3);
+        else {
+          line(c, x + 11, y - 10, x + 17, y - 4, col);
+          line(c, x + 17, y - 4, x + 17, y + 4, col);
+          line(c, x + 17, y + 4, x + 11, y + 10, col);
+        }
+      }
+      function discordControls(c, time) {
+        const states = [discordVoice.muted, discordVoice.deafened];
+        for (let i = 0; i < 2; i++) {
+          const x = 29 + i * 44;
+          const y = 176;
+          const color = states[i] ? PINK : WHITE;
+          const hit = pressed === i + 3 && time < until;
+          rr(c, x - 20, y - 17, 40, 34, 8, "#132033", hit ? YELLOW : TRACK);
+          if (i === 0) {
+            rr(c, x - 4, y - 10, 8, 13, 4, null, color);
+            c.beginPath();
+            c.moveTo(x - 8, y - 4);
+            c.lineTo(x - 8, y);
+            c.quadraticCurveTo(x - 8, y + 8, x, y + 8);
+            c.quadraticCurveTo(x + 8, y + 8, x + 8, y);
+            c.lineTo(x + 8, y - 4);
+            c.strokeStyle = color;
+            c.stroke();
+            line(c, x, y + 8, x, y + 12, color);
+            line(c, x - 5, y + 12, x + 5, y + 12, color);
+          } else {
+            c.beginPath();
+            c.arc(x, y, 10, Math.PI, 0);
+            c.strokeStyle = color;
+            c.lineWidth = 2;
+            c.stroke();
+            rr(c, x - 11, y - 1, 5, 11, 2, color);
+            rr(c, x + 6, y - 1, 5, 11, 2, color);
+          }
+          if (states[i]) line(c, x - 12, y - 12, x + 12, y + 12, PINK, 2);
+        }
+      }
+      function discordControlAt(x, y) {
+        if (y < 158 || y >= 194) return -1;
+        for (let i = 0; i < 2; i++) {
+          const center = 29 + i * 44;
+          if (x >= center - 21 && x < center + 21) return i;
+        }
+        return -1;
+      }
+      function toggleDiscordControl(control) {
+        pressed = control + 3;
+        until = performance.now() + 130;
+        if (control === 0) {
+          discordVoice.muted = !discordVoice.muted;
+          if (!discordVoice.muted) discordVoice.deafened = false;
+        } else {
+          discordVoice.deafened = !discordVoice.deafened;
+          if (discordVoice.deafened) {
+            discordVoice.wasMuted = discordVoice.muted;
+            discordVoice.muted = true;
+          } else {
+            discordVoice.muted = discordVoice.wasMuted;
+          }
+        }
+      }
+      function icon(c, index) {
+        if (index === 4) {
+          rr(c, 41, 78, 14, 25, 7, null, CYAN);
+          c.beginPath();
+          c.arc(48, 96, 14, 0, Math.PI);
+          c.strokeStyle = CYAN;
+          c.stroke();
+          line(c, 48, 110, 48, 121, CYAN);
+          line(c, 38, 121, 58, 121, CYAN);
+        } else if (index === 0) {
+          // Generic music symbol, not a recreation of an application logo.
+          line(c, 43, 83, 43, 109, CYAN, 3);
+          line(c, 61, 79, 61, 105, CYAN, 3);
+          line(c, 43, 83, 61, 79, CYAN, 4);
+          c.fillStyle = CYAN;
+          c.beginPath();
+          c.ellipse(37, 110, 6, 4, -0.3, 0, Math.PI * 2);
+          c.ellipse(55, 106, 6, 4, -0.3, 0, Math.PI * 2);
+          c.fill();
+        } else if (index === 1) {
+          // Generic chat symbol; the app name is a compatibility example.
+          rr(c, 26, 82, 44, 30, 6, null, CYAN);
+          line(c, 35, 112, 31, 120, CYAN);
+          line(c, 31, 120, 46, 112, CYAN);
+          line(c, 35, 92, 61, 92, CYAN);
+          line(c, 35, 101, 55, 101, CYAN);
+        } else speaker(c, 48, 100, CYAN, false);
+      }
+      function render(c, index, pct, mute, time, alpha = 1) {
+        c.globalAlpha = 1;
+        c.fillStyle = BG;
+        c.fillRect(0, 0, 320, 240);
+        for (let i = 0; i < 5; i++) {
+          rr(c, i * 64 + 3, 3, 58, 30, 5, "#132033", i === index ? YELLOW : TRACK);
+          txt(c, i + 1, i * 64 + 32, 18, 14, i === index ? YELLOW : DIM);
+        }
+        c.globalAlpha = alpha;
+        icon(c, index);
+        let name = names[index];
+        txt(c, name.length > 11 ? name.slice(0, 8) + "..." : name, 49, 146, 14);
+        if (index === 1) discordControls(c, time);
+        else txt(c, index === 4 ? "INPUT" : "CHANNEL", 49, 164, 8, DIM);
+        let lit = Math.round((pct / 100) * 30);
+        for (let i = 0; i < 30; i++) {
+          c.beginPath();
+          c.arc(200, 111, 60.5, ((135 + i * 9) * Math.PI) / 180, ((142 + i * 9) * Math.PI) / 180);
+          c.strokeStyle = !mute && i < lit ? CYAN : TRACK;
+          c.lineWidth = 9;
+          c.stroke();
+        }
+        if (mute) {
+          c.beginPath();
+          c.arc(200, 111, 43, 0, 7);
+          c.strokeStyle = PINK;
+          c.lineWidth = 2;
+          c.stroke();
+          speaker(c, 200, 111, WHITE, true);
+          txt(c, "MUTED", 200, 170, 14, PINK);
+        } else {
+          txt(c, Math.round(pct), 200, 114, 48);
+          txt(c, "VOLUME", 200, 170, 8, DIM);
+          if (percent) txt(c, "%", 282, 113, 14, DIM);
+        }
+        c.globalAlpha = 1;
+        ["−", mute ? "UNMUTE" : "MUTE", "+"].forEach((s, i) => {
+          let col = i === 1 ? PINK : CYAN,
+            hit = c === contexts.active && pressed === i && time < until;
+          rr(c, i * 110 + 3, 204, 94, 33, 6, hit ? col : "#132033", col);
+          txt(c, s, i * 110 + 50, 220, 14, hit ? BG : col);
+        });
+      }
+      // Original mixer idle graphic, adapted only to the touch panel and dark palette.
+      function drawIdle(c, now) {
+        c.fillStyle = BG;
+        c.fillRect(0, 0, 320, 240);
+        const phase = (now % 1800) / 1800;
+        const breath = 0.5 + 0.5 * Math.sin(phase * Math.PI * 2 - 1.5708);
+        c.save();
+        c.strokeStyle = CYAN;
+        c.globalAlpha = 0.18 + 0.38 * breath;
+        c.lineWidth = 1;
+        for (const radius of [105, 106]) {
+          c.beginPath();
+          c.arc(160, 120, radius, 0, Math.PI * 2);
+          c.stroke();
+        }
+        c.restore();
+        const speeds = [0.28, 0.19, 0.23];
+        const phases = [0, 2.094, 4.189];
+        const radii = [70, 80, 74];
+        const drift = [5, 4, 6];
+        const colors = [CYAN, PINK, YELLOW];
+        const seconds = now / 1000;
+        for (let i = 0; i < 3; i++) {
+          const angle = seconds * speeds[i] * Math.PI * 2 + phases[i];
+          const radius = radii[i] + drift[i] * Math.sin(seconds * 0.7 + phases[i]);
+          c.fillStyle = colors[i];
+          c.beginPath();
+          c.arc(160 + radius * Math.cos(angle), 120 + radius * Math.sin(angle), 3, 0, Math.PI * 2);
+          c.fill();
+        }
+        txt(c, "AudioMixer", 160, 112, 14);
+        txt(c, "READY", 160, 132, 8, DIM);
+        c.save();
+        c.font = "8px monospace";
+        c.fillStyle = DIM;
+        c.textBaseline = "top";
+        c.textAlign = "left";
+        c.fillText("SD 29.72 GiB free", 4, 232);
+        c.textAlign = "right";
+        c.fillText("Connected", 316, 232);
+        c.restore();
+      }
+      function frame(now) {
+        shown += (values[selected] - shown) * 0.3;
+        let t = Math.min(1, (now - transition) / 180);
+        render(contexts.active, selected, shown, mutes[selected], now, 1 - (1 - t) * (1 - t));
+        render(contexts.muted, 1, 45, true, now);
+        drawIdle(contexts.idle, now);
+        requestAnimationFrame(frame);
+      }
+      function choose(i) {
+        selected = (i + 5) % 5;
+        shown = values[selected];
+        transition = performance.now();
+      }
+      function act(a) {
+        pressed = a;
+        until = performance.now() + 130;
+        if (a === 1) mutes[selected] = !mutes[selected];
+        else values[selected] = Math.max(0, Math.min(100, values[selected] + (a === 0 ? -2 : 2)));
+      }
+      function arcValue(x, y) {
+        let dx = x - 200,
+          dy = y - 111,
+          r = dx * dx + dy * dy;
+        if (r < 45 * 45 || r > 82 * 82) return null;
+        let d = (Math.atan2(dx, -dy) * 180) / Math.PI;
+        return d < -135 || d > 135 ? null : ((d + 135) / 270) * 100;
+      }
+      function point(e) {
+        let r = e.target.getBoundingClientRect();
+        return [((e.clientX - r.left) * 320) / r.width, ((e.clientY - r.top) * 240) / r.height];
+      }
+      const active = document.getElementById("active");
+      active.onpointerdown = (e) => {
+        active.setPointerCapture(e.pointerId);
+        let [x, y] = point(e);
+        if (y < 36) {
+          choose(Math.floor(x / 64));
+          return;
+        }
+        const voiceControl = selected === 1 ? discordControlAt(x, y) : -1;
+        if (voiceControl >= 0) {
+          toggleDiscordControl(voiceControl);
+          return;
+        }
+        if (y >= 202) {
+          if (x < 100) act(0);
+          else if (x >= 110 && x < 210) act(1);
+          else if (x >= 220) act(2);
+          return;
+        }
+        let v = arcValue(x, y);
+        drag = v !== null;
+        if (drag) values[selected] = v;
+      };
+      active.onpointermove = (e) => {
+        if (drag) {
+          let v = arcValue(...point(e));
+          if (v !== null) values[selected] = v;
+        }
+      };
+      active.onpointerup = active.onpointercancel = () => (drag = false);
+      document.getElementById("muted").onpointerdown = (event) => {
+        const control = discordControlAt(...point(event));
+        if (control >= 0) toggleDiscordControl(control);
+      };
+      document.getElementById("prev").onclick = () => choose(selected - 1);
+      document.getElementById("next").onclick = () => choose(selected + 1);
+      document.getElementById("minus").onclick = () => act(0);
+      document.getElementById("plus").onclick = () => act(2);
+      document.getElementById("mute").onclick = () => act(1);
+      document.getElementById("percent").onclick = () => (percent = !percent);
+      document.getElementById("mic").onclick = () => choose(4);
+      requestAnimationFrame(frame);
+    </script>
+  </body>
+</html>

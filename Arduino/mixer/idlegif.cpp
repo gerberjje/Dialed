@@ -1,3 +1,5 @@
+#include "controller_profile.h"
+#if !DIALED_CONTROLLER_TOUCH
 #include "idlegif.h"
 #include "display.h"
 #include <TFT_eSPI.h>
@@ -308,3 +310,4 @@ void idleGifTick(unsigned long now) {
   drawFrame(frameIndex);
   lastFrameMs = now;
 }
+#endif

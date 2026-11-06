@@ -1,18 +1,8 @@
-# Dialed — mixer-touch
+# Dialed
 
-> The less tactile experience.
+> A hardware-controlled, per-application volume mixer for Windows.
 
-**mixer-touch** is the touchscreen variant of Dialed. The current firmware targets
-an ESP32-2432S028-family board with an ILI9341 display and XPT2046 resistive touch
-controller. Other boards are not currently validated and may require hardware
-configuration changes or firmware porting. Select one of five channels, drag the volume arc,
-use the minus/plus buttons, or tap MUTE. Discord channels also offer microphone
-mute and deafen controls. The original knob-based firmware remains available.
-
-For touch-board setup, firmware builds and hardware details, see
-[`Arduino/README.md`](Arduino/README.md).
-
-The original Dialed pairs a small physical controller (an ESP32 with knobs or rotary
+Dialed pairs a small physical controller (an ESP32/Arduino with knobs or rotary
 encoders, a push switch, and a round display) with a Windows desktop app so you can
 set the volume of individual apps — Spotify, a game, your call — by turning a real
 knob, mute with a press, and flip your default output device with a switch. The
@@ -23,11 +13,11 @@ controller's round display shows the app icon and volume of whatever you're adju
 
 ## Features
 
-- Per-app **and** master volume control from touch controls or physical knobs / rotary encoders
-- Mute an app with a touch button or knob press
+- Per-app **and** master volume control from physical knobs / rotary encoders
+- Mute an app with a knob press
 - Switch the Windows default output device from a hardware switch (or in-app)
-- Live app icons + volume on the touch board's 320 x 240 display or the original round GC9A01
-- Idle-screen media stored on SD, with internal-flash fallback
+- Live app icons + volume mirrored to the controller's round GC9A01 display
+- Idle-screen GIF library uploaded to the controller's flash
 - Runs from the system tray; optional start-with-Windows
 - English and Portuguese (PT-PT) localization
 
@@ -63,22 +53,12 @@ connected before publishing.
 
 ## Hardware
 
-Connect a companion controller over USB serial:
-
-- **mixer-touch:** an ESP32-2432S028-family board with a 320 x 240 ILI9341 display
-  and XPT2046 resistive touch. No external knobs or output switch are required.
-- **Original mixer:** an ESP32 with potentiometers or rotary encoders, a push
-  switch, and a round GC9A01 display.
-
-Wiring, the serial protocol, and firmware instructions live in
-**[`Arduino/README.md`](Arduino/README.md)**. The touch-board sketch is
-`Arduino/mixer_touch`; `Arduino/mixer` retains the original upstream controller firmware.
+You need the companion controller: an ESP32 (or Arduino Nano variant) with
+potentiometers or rotary encoders, a push switch, and a round GC9A01 display,
+connected over USB serial. Wiring, the serial protocol, and the firmware sketches
+live in **[`Arduino/README.md`](Arduino/README.md)**.
 
 ## Installation
-
-For mixer-touch, build the app from this branch and flash `Arduino/mixer_touch`
-using the [firmware instructions](Arduino/README.md#build-and-flash). Published
-releases may not include this branch's touch and Discord support.
 
 1. Go to the [**Releases**](../../releases) page.
 2. Download the latest `Dialed-Setup-<version>-x64.exe`.
@@ -94,14 +74,33 @@ Requires 64-bit Windows 10 version 1809 (build 17763) or newer.
 
 1. Plug in the controller over USB.
 2. Launch Dialed; open **Settings** and pick the controller's COM port.
-3. For mixer-touch, set **Input type** to **Rotary encoder** and **Hardware controls**
-   to **5**. On the mixer page, assign an app to each channel.
-4. Tap a channel tab, then drag the volume arc or use minus/plus to adjust volume;
-   tap **MUTE** to toggle playback mute. On Discord channels, use the microphone
-   and headset icons for Discord mute/deafen. Change the output device in the app.
+3. On the mixer page, assign an app to each knob.
+4. Turn a knob to set that app's volume; press to mute; use the switch to change the
+   output device.
 
-With the original controller, turn a knob to set volume, press to mute, and use
-the hardware switch to change the output device.
+## mixer-touch
+
+> The less tactile experience.
+
+**mixer-touch** is a touchscreen controller variant for Dialed. The current target
+is an ESP32-2432S028-family board with an ILI9341 320 x 240 landscape display and
+XPT2046 resistive touch. Other boards require matching hardware configuration or
+firmware porting and have not been validated.
+
+Touch support is additional `*_touch.cpp` / `*_touch.h` files inside `Arduino/mixer`.
+The existing mixer files and default build remain in place. Build touch firmware
+explicitly with `./Arduino/tools/build-firmware.ps1 -Controller touch`; build the
+companion desktop app from this branch. Published upstream releases do not include
+these local additions.
+
+For touch use, select the controller's COM port, set **Input type** to **Rotary encoder**
+and **Hardware controls** to **5**, then assign apps to the channels. Tap a channel
+and drag its volume arc or use minus/plus; tap **MUTE** for playback mute. Discord
+channels also offer mic mute and deafen controls. Change the output device in the app.
+
+Touch media fills the native 320 x 240 panel, cropping only when the source aspect
+ratio differs. Mixer and older firmware retain their existing 240 x 240 behavior.
+SD storage has internal-flash fallback. See [firmware setup and limitations](Arduino/README.md#touch-build-and-flash).
 
 ## Build from source
 
@@ -132,11 +131,15 @@ controller firmware. For a full tour of the code, see
 
 ## Releasing
 
+This branch targets **v1.4.0**, following upstream's published v1.3.0. App versions
+continue to come from the release tag; firmware versions remain independently
+tracked in `Arduino/mixer/version.h`. No tag or release is created by this plan.
+
 Push a version tag and GitHub Actions builds the installer and publishes a Release:
 
 ```bash
-git tag v1.0.0
-git push origin v1.0.0
+git tag v1.4.0
+git push origin v1.4.0
 ```
 
 The [`Release`](.github/workflows/release.yml) workflow publishes the x64
@@ -167,7 +170,7 @@ Shared defaults are in `.editorconfig`: spaces, UTF-8, LF line endings, a final 
 and a 100-column guideline. C# and XAML use four spaces; C++ and web files use two.
 
 Use `dotnet format whitespace Dialed.csproj --no-restore` for C#, `clang-format`
-with `.clang-format` for touch firmware, and Prettier with `.prettierrc.json` for
+with `.clang-format` for shared and touch firmware, and Prettier with `.prettierrc.json` for
 HTML, embedded CSS/JavaScript, JSON and YAML. The prototypes are source files and
 should remain expanded, rather than minified. Preserve generated bitmap/font data
-and the restored upstream `mixer`/`mixer_nano` targets when doing bulk formatting.
+and the default `mixer` implementation and `mixer_nano` target when doing bulk formatting.

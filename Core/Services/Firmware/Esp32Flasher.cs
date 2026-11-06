@@ -27,7 +27,8 @@ public sealed partial class Esp32Flasher : IBoardFlasher
     {
         BoardId = manifest.Board;
         FirmwareVersion = manifest.Version;
-        DisplayName = Loc.Get("Flash_Board_Esp32");
+        DisplayName = Loc.Get(manifest.Board == "esp32-mixer-touch"
+            ? "Flash_Board_Esp32Touch" : "Flash_Board_Esp32");
         _esptoolPath = esptoolPath;
         _binPath = binPath;
     }

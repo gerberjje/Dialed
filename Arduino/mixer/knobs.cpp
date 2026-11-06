@@ -1,3 +1,5 @@
+#include "controller_profile.h"
+#if !DIALED_CONTROLLER_TOUCH
 #include "knobs.h"
 #include <Arduino.h>
 
@@ -260,3 +262,4 @@ void knobsLoop() {
   }
 #endif
 }
+#endif

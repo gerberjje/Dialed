@@ -15,18 +15,28 @@ public class AppSettings
     public int RefreshIntervalSeconds { get; set; } = 2;
     public int IdleTimeoutSeconds { get; set; } = 3;
     public double NavPaneWidth { get; set; } = 320;
-    public InputMode InputMode { get; set; } = InputMode.Potentiometer;
+    public InputMode InputMode { get; set; } = InputMode.RotaryEncoder;
     public float EncoderStepPercent { get; set; } = 2f;
-    public int KnobCount { get; set; } = 4;
+    public int KnobCount { get; set; } = 5;
     public List<ChannelConfig> Channels { get; set; } = new();
     public List<string> ExcludedProcesses { get; set; } = new();
     public bool DebugSerialEvents { get; set; } = false;
     public bool ShowPercentSign { get; set; } = false;
+    public bool ShowDiscordStatus { get; set; } = true;
     public List<IdleGifConfig> IdleGifs { get; set; } = new();
-    public string? ActiveIdleGifId { get; set; }
+    public string? ActiveIdleGifId
+    {
+        get; set;
+    }
 
     // The two playback endpoints the hardware output switch toggles between.
     // Stored as Core Audio device ids (GUID strings); null until assigned.
-    public string? OutputDeviceAId { get; set; }
-    public string? OutputDeviceBId { get; set; }
+    public string? OutputDeviceAId
+    {
+        get; set;
+    }
+    public string? OutputDeviceBId
+    {
+        get; set;
+    }
 }

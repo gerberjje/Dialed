@@ -28,6 +28,12 @@ public partial class MainViewModel : ObservableObject
     // handle and re-open automatically. Fixed cadence (independent of the session
     // refresh interval) so reconnection stays responsive even if refresh is slow.
     private readonly DispatcherTimer _connectionTimer;
+    private readonly DispatcherTimer _discordTimer;
+    private readonly DiscordVoiceStatusService _discordStatus = new();
+    private bool _pollingDiscord;
+    private bool _discordActionInProgress;
+    private int _discordGeneration;
+    private readonly Dictionary<string, DiscordVoiceState> _discordStates = new(StringComparer.OrdinalIgnoreCase);
     private SerialManager _serial;
     // What the UI currently reflects about the connection, so the watchdog can spot a
     // drop even when Windows closes the handle itself on unplug (IsConnected flips
@@ -44,6 +50,8 @@ public partial class MainViewModel : ObservableObject
     [ObservableProperty]
     private string? installedFirmwareVersion;
 
+    private string? _installedFirmwareBoard;
+
     /// <summary>The ESP32 flasher (bundled firmware), or null if assets are missing.</summary>
     public IBoardFlasher? Esp32Flasher => _firmwareCatalog.Esp32;
 
@@ -56,7 +64,11 @@ public partial class MainViewModel : ObservableObject
         : Loc.Get("Settings_Firmware_Installed", InstalledFirmwareVersion);
 
     partial void OnInstalledFirmwareVersionChanged(string? value)
-        => OnPropertyChanged(nameof(FirmwareInstalledText));
+    {
+        if (value is null)
+            _installedFirmwareBoard = null;
+        OnPropertyChanged(nameof(FirmwareInstalledText));
+    }
 
     [ObservableProperty]
     private string comPort;
@@ -97,6 +109,12 @@ public partial class MainViewModel : ObservableObject
 
     [ObservableProperty]
     private bool showPercentSign;
+
+    [ObservableProperty]
+    private bool showDiscordStatus;
+
+    [ObservableProperty]
+    private string discordStatusText = Loc.Get("Discord_Status_Unknown");
 
     // Backed by the registry Run key (see StartupService), not settings.json.
     [ObservableProperty]
@@ -148,6 +166,8 @@ public partial class MainViewModel : ObservableObject
         autoReconnect = _settings.AutoReconnect;
         debugSerialEvents = _settings.DebugSerialEvents;
         showPercentSign = _settings.ShowPercentSign;
+        showDiscordStatus = _settings.ShowDiscordStatus;
+        DiscordStatusText = Loc.Get(showDiscordStatus ? "Discord_Status_Unknown" : "Discord_Status_Disabled");
         startWithWindows = StartupService.IsEnabled;
         language = _settings.Language;
 
@@ -155,8 +175,16 @@ public partial class MainViewModel : ObservableObject
             HiddenProcesses.Add(process);
 
         Output = new OutputViewModel(_settings, _outputManager, () => SettingsService.Save(_settings));
-        Output.AssignmentChanged += (pos, isHeadset, name) => _serial.SendOutputAssignment(pos, isHeadset, name);
-        Output.SwitchApplied += (pos, state) => _serial.SendOutputSwitch(pos, state);
+        Output.AssignmentChanged += (pos, isHeadset, name) =>
+        {
+            if (_serial is not null)
+                _serial.SendOutputAssignment(pos, isHeadset, name);
+        };
+        Output.SwitchApplied += (pos, state) =>
+        {
+            if (_serial is not null)
+                _serial.SendOutputSwitch(pos, state);
+        };
 
         // Serial must be created before channels are added: AddChannelInternal
         // reads _serial.IsConnected to seed each channel's connected state.
@@ -181,6 +209,12 @@ public partial class MainViewModel : ObservableObject
         _connectionTimer.Tick += (_, _) => CheckConnection();
         if (AutoReconnect)
             _connectionTimer.Start();
+
+        _discordTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(1) };
+        _discordTimer.Tick += async (_, _) => await PollDiscordStatusAsync();
+        _discordTimer.Start();
+        _ = PollDiscordStatusAsync();
+
     }
 
     // Waits for the controller to finish booting after a (re)connect, then pushes
@@ -294,13 +328,10 @@ public partial class MainViewModel : ObservableObject
             PushIdleGifAsync, ClearIdleGif, () => _serial.IsConnected);
     }
 
-    // Display target for the GC9A01 (square; the round bezel hides the corners).
-    private const int IdleGifTarget = 240;
     // Upper bound on frames regardless of free space — caps upload time and the
     // firmware's in-RAM delay table (must stay <= MAX_GIF_FRAMES in idlegif.cpp).
     private const int IdleGifFrameCap = 60;
-    // The board renders 240x240 from flash at ~15-20fps; resampling to this avoids
-    // wasting flash on frames it can't show and keeps playback at the right speed.
+    // Bound encoded frame rate; actual playback depends on media size and storage throughput.
     private const int IdleGifMaxFps = 20;
 
     /// <summary>
@@ -317,11 +348,14 @@ public partial class MainViewModel : ObservableObject
         if (!File.Exists(path))
             throw new IdleGifUploadException(Loc.Get("Gif_MissingCache"));
 
+        var target = await _serial.QueryIdleMediaDimensionsAsync(ct);
         long free = await _serial.QueryIdleGifSpaceAsync(ct);
+        if (free == -2)
+            throw new IdleGifUploadException(Loc.Get("Gif_SpacePending"));
         if (free < 0)
             throw new IdleGifUploadException(Loc.Get("Gif_NoResponse_Conn"));
 
-        long frameBytes = (long)IdleGifTarget * IdleGifTarget * 2;
+        long frameBytes = (long)target.Width * target.Height * 2;
         long headerEstimate = 16 + 2L * IdleGifFrameCap; // magic+dims + delay table
         int byBudget = (int)((free - headerEstimate) / frameBytes);
         if (byBudget < 1)
@@ -329,7 +363,7 @@ public partial class MainViewModel : ObservableObject
 
         int cap = Math.Min(IdleGifFrameCap, byBudget);
 
-        var encoded = await Task.Run(() => GifFrameEncoder.Encode(path, IdleGifTarget, cap, IdleGifMaxFps), ct);
+        var encoded = await Task.Run(() => GifFrameEncoder.Encode(path, target.Width, target.Height, cap, IdleGifMaxFps), ct);
         await _serial.UploadIdleGifAsync(encoded, progress, ct);
     }
 
@@ -345,6 +379,11 @@ public partial class MainViewModel : ObservableObject
     {
         var flasher = Esp32Flasher
             ?? throw new FlashException(Loc.Get("Flash_Err_EsptoolMissing"));
+
+        if (_serial.IsConnected && _installedFirmwareBoard is not null &&
+            !string.Equals(_installedFirmwareBoard, flasher.BoardId, StringComparison.Ordinal))
+            throw new FlashException(Loc.Get("Flash_Err_ControllerMismatch",
+                _installedFirmwareBoard, flasher.BoardId));
 
         var port = ComPort;
         var watchdogWasRunning = _connectionTimer.IsEnabled;
@@ -376,6 +415,8 @@ public partial class MainViewModel : ObservableObject
         serial.KnobChanged += OnKnobChanged;
         serial.KnobDelta += OnKnobDelta;
         serial.KnobPressed += OnKnobPressed;
+        serial.DiscordMuteRequested += OnDiscordMuteRequested;
+        serial.DiscordDeafenRequested += OnDiscordDeafenRequested;
         serial.SwitchChanged += OnSwitchChanged;
         serial.FirmwareReported += OnFirmwareReported;
 
@@ -412,6 +453,7 @@ public partial class MainViewModel : ObservableObject
     {
         UnsubscribeSerial(_serial);
         _serial.Stop();
+        _installedFirmwareBoard = null;
     }
 
     private void UnsubscribeSerial(SerialManager serial)
@@ -419,15 +461,21 @@ public partial class MainViewModel : ObservableObject
         serial.KnobChanged -= OnKnobChanged;
         serial.KnobDelta -= OnKnobDelta;
         serial.KnobPressed -= OnKnobPressed;
+        serial.DiscordMuteRequested -= OnDiscordMuteRequested;
+        serial.DiscordDeafenRequested -= OnDiscordDeafenRequested;
         serial.SwitchChanged -= OnSwitchChanged;
         serial.FirmwareReported -= OnFirmwareReported;
     }
 
     private void OnFirmwareReported(string board, string version)
-        => _dispatcherQueue.TryEnqueue(() => InstalledFirmwareVersion = version);
+        => _dispatcherQueue.TryEnqueue(() =>
+        {
+            _installedFirmwareBoard = board;
+            InstalledFirmwareVersion = version;
+        });
 
     [RelayCommand]
-    private void AddChannel() => AddChannelInternal("Select App");
+    private void AddChannel() => AddChannelInternal(ChannelViewModel.UnassignedAppName);
 
     private void AddChannelInternal(string appName, int? knobIndex = null, bool save = true)
     {
@@ -450,6 +498,7 @@ public partial class MainViewModel : ObservableObject
 
     private void RemoveChannelInternal(ChannelViewModel channel)
     {
+        _serial.SendDiscordMuteEnabled(channel.KnobIndex, false);
         Channels.Remove(channel);
         SaveChannels();
     }
@@ -474,6 +523,11 @@ public partial class MainViewModel : ObservableObject
     {
         var color = _audioManager.GetIconColor(ch.AppName);
         var icon = _audioManager.GetIconRgb565(ch.AppName);
+        var kind = ch.AppName.Equals(AudioManager.MicrophoneVolumeProcessName, StringComparison.OrdinalIgnoreCase)
+            ? 'm'
+            : ch.AppName.Equals(AudioManager.MasterVolumeProcessName, StringComparison.OrdinalIgnoreCase)
+                ? 's'
+                : 'a';
         // Only push the label/color/icon — the device stores these silently and
         // stays on its idle screen. Deliberately no SendVolume here: a "vol:" line
         // makes the device switch to the volume screen (displayShowKnob), so echoing
@@ -487,7 +541,83 @@ public partial class MainViewModel : ObservableObject
         // sentinel instead of the localized "System"/"Sistema", and regular apps their
         // lowercase process name. ch.AppName stays the identifier everywhere else
         // (settings, session matching, icon lookup).
-        _serial.SendAssignment(ch.KnobIndex, AudioManager.GetDisplayName(ch.AppName), color, icon);
+        // Clear an old slot when a channel moves to a different knob.
+        for (var index = 0; index < KnobCount; index++)
+            if (index != ch.KnobIndex && !Channels.Any(c => c.KnobIndex == index))
+                _serial.SendDiscordMuteEnabled(index, false);
+
+        _serial.SendDiscordMuteEnabled(ch.KnobIndex, DiscordProcess.IsSupported(ch.AppName));
+        _serial.SendAssignment(ch.KnobIndex, AudioManager.GetDisplayName(ch.AppName), kind, color, icon);
+        SendCurrentChannelState(ch);
+        SendDiscordState(ch);
+    }
+
+    private void SendDiscordState(ChannelViewModel channel)
+    {
+        var process = channel.AppName;
+        if (!DiscordProcess.IsSupported(process))
+            return;
+        var state = ShowDiscordStatus && _discordStates.TryGetValue(process, out var current)
+            ? current : DiscordVoiceState.Unknown;
+        _serial.SendDiscordStatus(channel.KnobIndex, state);
+    }
+
+    private async Task PollDiscordStatusAsync()
+    {
+        if (_pollingDiscord || !ShowDiscordStatus)
+            return;
+        _pollingDiscord = true;
+        var generation = _discordGeneration;
+        try
+        {
+            var processes = Channels.Select(c => c.AppName)
+                .Where(DiscordProcess.IsSupported).Distinct(StringComparer.OrdinalIgnoreCase).ToArray();
+            foreach (var process in processes)
+            {
+                var state = await _discordStatus.ReadAsync(process);
+                if (!ShowDiscordStatus || generation != _discordGeneration)
+                    return;
+                _discordStates[process] = state;
+            }
+            if (!ShowDiscordStatus || generation != _discordGeneration)
+                return;
+            foreach (var channel in Channels)
+                SendDiscordState(channel);
+            var states = processes.Select(p => _discordStates.GetValueOrDefault(p, DiscordVoiceState.Unknown)).ToArray();
+            DiscordStatusText = states.Length == 1 && states[0].IsKnown
+                ? Loc.Get("Discord_Status_Live",
+                    Loc.Get(states[0].IsMuted == true ? "Discord_Muted" : "Discord_Unmuted"),
+                    Loc.Get(states[0].IsDeafened == true ? "Discord_Deafened" : "Discord_Listening"))
+                : Loc.Get("Discord_Status_Unknown");
+        }
+        catch (Exception ex)
+        {
+            _discordStates.Clear();
+            foreach (var channel in Channels)
+                SendDiscordState(channel);
+            DiscordStatusText = Loc.Get("Discord_Status_Unknown");
+            LogSerial($"Discord status unavailable: {ex.GetType().Name}");
+        }
+        finally { _pollingDiscord = false; }
+    }
+
+    partial void OnShowDiscordStatusChanged(bool value)
+    {
+        _settings.ShowDiscordStatus = value;
+        SettingsService.Save(_settings);
+        _discordGeneration++;
+        _discordStates.Clear();
+        DiscordStatusText = Loc.Get(value ? "Discord_Status_Unknown" : "Discord_Status_Disabled");
+        foreach (var channel in Channels)
+            SendDiscordState(channel);
+        if (value)
+            _ = PollDiscordStatusAsync();
+    }
+
+    private void SendCurrentChannelState(ChannelViewModel channel)
+    {
+        var (volume, muted) = channel.GetCurrentAudioState();
+        _serial.SendChannelState(channel.KnobIndex, (float)(volume / 100.0), muted);
     }
 
     private void SyncAllChannels()
@@ -504,6 +634,15 @@ public partial class MainViewModel : ObservableObject
         // The controller samples all its physical knobs by default; tell it how many
         // are actually wired so unconnected pins can't emit phantom knob events.
         _serial.SendKnobCount(KnobCount);
+
+        // Seed every value before sending any ~11 KB icon payload. This makes all
+        // controls correct immediately after startup, even while artwork is still
+        // crossing the serial link.
+        for (var index = 0; index < KnobCount; index++)
+            _serial.SendDiscordMuteEnabled(index, false);
+
+        foreach (var ch in Channels)
+            SendCurrentChannelState(ch);
 
         foreach (var ch in Channels)
             SyncChannel(ch);
@@ -731,6 +870,45 @@ public partial class MainViewModel : ObservableObject
         {
             LogSerial($"switch → position {(position == 0 ? "A" : "B")}");
             Output.ApplySwitchPosition(position, isInitial);
+        });
+    }
+
+    private void OnDiscordMuteRequested(string knobId) => OnDiscordVoiceToggleRequested(knobId, deafen: false);
+    private void OnDiscordDeafenRequested(string knobId) => OnDiscordVoiceToggleRequested(knobId, deafen: true);
+
+    private void OnDiscordVoiceToggleRequested(string knobId, bool deafen)
+    {
+        if (ParseKnobIndex(knobId) is not int index)
+            return;
+        _dispatcherQueue.TryEnqueue(async () =>
+        {
+            if (_discordActionInProgress)
+                return;
+            var channel = Channels.FirstOrDefault(c => c.KnobIndex == index);
+            var process = channel?.AppName;
+            if (process is null || !DiscordProcess.IsSupported(process))
+                return;
+
+            _discordActionInProgress = true;
+            try
+            {
+                var requested = deafen
+                    ? await _discordStatus.ToggleDeafenAsync(process)
+                    : await _discordStatus.ToggleMuteAsync(process);
+                var control = deafen ? "headset deafen" : "microphone mute";
+                LogSerial($"{knobId} → Discord direct {control} toggle {(requested ? "requested" : "unavailable")}");
+                if (!requested)
+                    DiscordStatusText = Loc.Get("Discord_Control_Unavailable");
+                // Refresh from Discord; never guess its state from a button press.
+                if (requested)
+                    await PollDiscordStatusAsync();
+            }
+            catch (Exception ex)
+            {
+                DiscordStatusText = Loc.Get("Discord_Control_Unavailable");
+                LogSerial($"Discord voice control unavailable: {ex.GetType().Name}");
+            }
+            finally { _discordActionInProgress = false; }
         });
     }
 

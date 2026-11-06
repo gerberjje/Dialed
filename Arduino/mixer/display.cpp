@@ -1,3 +1,5 @@
+#include "controller_profile.h"
+#if !DIALED_CONTROLLER_TOUCH
 #include "display.h"
 #include "assignments.h"
 #include "mute_icon.h"
@@ -723,3 +725,4 @@ void displayTick() {
     }
   }
 }
+#endif

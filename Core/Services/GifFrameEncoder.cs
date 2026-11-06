@@ -43,8 +43,14 @@ public static class GifFrameEncoder
 {
     private const int PropertyTagFrameDelay = 0x5100; // GDI+ per-frame delay, in 1/100 s
 
+    // Preserve the existing square entry point for mixer and callers.
     public static EncodedGif Encode(string filePath, int target, int maxFrames, int maxFps)
+        => Encode(filePath, target, target, maxFrames, maxFps);
+
+    public static EncodedGif Encode(string filePath, int width, int height, int maxFrames, int maxFps)
     {
+        if (width <= 0 || height <= 0)
+            throw new ArgumentOutOfRangeException(nameof(width), "Target dimensions must be positive.");
         using var img = new Bitmap(filePath);
 
         int frameCount;
@@ -86,11 +92,11 @@ public static class GifFrameEncoder
             frames.Add(new EncodedGifFrame
             {
                 DelayMs = (ushort)Math.Clamp(delayMs, 10, 65535),
-                Rgb565 = RenderFrameToRgb565(img, target),
+                Rgb565 = RenderFrameToRgb565(img, width, height),
             });
         }
 
-        return new EncodedGif { Width = target, Height = target, Frames = frames };
+        return new EncodedGif { Width = width, Height = height, Frames = frames };
     }
 
     private static int[] ReadFrameDelaysCentis(Bitmap img, int frameCount)
@@ -138,40 +144,40 @@ public static class GifFrameEncoder
     }
 
     // Scale uniform-to-fill, centre-crop to target×target, pack as little-endian RGB565.
-    private static byte[] RenderFrameToRgb565(Bitmap frame, int target)
+    private static byte[] RenderFrameToRgb565(Bitmap frame, int width, int height)
     {
-        using var canvas = new Bitmap(target, target, PixelFormat.Format32bppArgb);
+        using var canvas = new Bitmap(width, height, PixelFormat.Format32bppArgb);
         using (var g = Graphics.FromImage(canvas))
         {
             g.InterpolationMode = InterpolationMode.HighQualityBicubic;
             g.PixelOffsetMode = PixelOffsetMode.HighQuality;
             g.Clear(Color.Black);
 
-            double scale = Math.Max((double)target / frame.Width, (double)target / frame.Height);
+            double scale = Math.Max((double)width / frame.Width, (double)height / frame.Height);
             int dw = (int)Math.Ceiling(frame.Width * scale);
             int dh = (int)Math.Ceiling(frame.Height * scale);
-            int dx = (target - dw) / 2;
-            int dy = (target - dh) / 2;
+            int dx = (width - dw) / 2;
+            int dy = (height - dh) / 2;
             g.DrawImage(frame, dx, dy, dw, dh);
         }
 
-        var data = canvas.LockBits(new Rectangle(0, 0, target, target),
+        var data = canvas.LockBits(new Rectangle(0, 0, width, height),
             ImageLockMode.ReadOnly, PixelFormat.Format32bppArgb);
         try
         {
-            var bgra = new byte[data.Stride * target];
+            var bgra = new byte[data.Stride * height];
             Marshal.Copy(data.Scan0, bgra, 0, bgra.Length);
 
-            var rgb565 = new byte[target * target * 2];
-            for (int y = 0; y < target; y++)
+            var rgb565 = new byte[width * height * 2];
+            for (int y = 0; y < height; y++)
             {
                 int row = y * data.Stride;
-                for (int x = 0; x < target; x++)
+                for (int x = 0; x < width; x++)
                 {
                     int o = row + x * 4;             // BGRA
                     byte b = bgra[o], grn = bgra[o + 1], r = bgra[o + 2];
                     ushort px = (ushort)(((r >> 3) << 11) | ((grn >> 2) << 5) | (b >> 3));
-                    int p = (y * target + x) * 2;
+                    int p = (y * width + x) * 2;
                     rgb565[p] = (byte)(px & 0xFF);   // LSB first — matches firmware
                     rgb565[p + 1] = (byte)(px >> 8);
                 }

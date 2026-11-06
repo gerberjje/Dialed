@@ -1,0 +1,16 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+    <DefineConstants Condition="'$(BaselineEncoder)' != ''">$(DefineConstants);BASELINE</DefineConstants>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="System.Drawing.Common" Version="8.0.7" />
+    <Compile Include="../../../Core/Services/GifFrameEncoder.cs" Link="GifFrameEncoder.cs" />
+    <Compile Include="Program.cs.txt" />
+    <Compile Include="$(BaselineEncoder)" Condition="'$(BaselineEncoder)' != ''" Link="BaselineEncoder.cs" />
+  </ItemGroup>
+</Project>

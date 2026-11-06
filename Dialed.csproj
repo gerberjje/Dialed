@@ -42,6 +42,8 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <Compile Remove="tmp\**\*.cs" />
+    <Compile Remove="Arduino\tests\**\*.cs" />
     <!--
       CopyToOutputDirectory is required so the assets land next to the exe in BOTH
       build and publish output. MainWindow loads Assets\AudioMixer.ico at runtime
@@ -84,6 +86,8 @@
     <ProjectCapability Include="Msix" />
   </ItemGroup>
   <ItemGroup>
+    <!-- Native UI Automation exposes AutoSetFocus=false for background control. -->
+    <PackageReference Include="Interop.UIAutomationClient" Version="10.19041.0" />
     <PackageReference Include="AudioSwitcher.AudioApi" Version="4.0.0-alpha5" />
     <PackageReference Include="AudioSwitcher.AudioApi.CoreAudio" Version="4.0.0-alpha5" />
     <PackageReference Include="CommunityToolkit.Mvvm" Version="8.4.2" />
@@ -95,6 +99,7 @@
     <PackageReference Include="System.IO.Ports" Version="10.0.9" />
     <PackageReference Include="System.Management" Version="8.0.0" />
   </ItemGroup>
+
   <ItemGroup>
     <Folder Include="Core\Services\" />
   </ItemGroup>

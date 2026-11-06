@@ -20,6 +20,7 @@ public class IdleGifUploadException : Exception
 public class SerialManager
 {
     private readonly SerialPort _port;
+    private readonly object _writeLock = new();
 
     // Raw bytes per GIF-upload chunk. Its base64 (×4/3, ~5462 chars) plus the
     // "gif:d:" prefix must stay well under the firmware's serial RX buffer so a
@@ -29,6 +30,8 @@ public class SerialManager
     public event Action<string, float>? KnobChanged;
     public event Action<string, int>? KnobDelta;
     public event Action<string>? KnobPressed;
+    public event Action<string>? DiscordMuteRequested;
+    public event Action<string>? DiscordDeafenRequested;
 
     // Position of the two-way output switch: 0 = A, 1 = B. The controller sends
     // "switch:0" / "switch:1" (or "switch:a" / "switch:b") whenever the toggle
@@ -52,6 +55,8 @@ public class SerialManager
     // coroutine can await them without racing the knob-event handlers.
     private readonly Channel<string> _gifResponses =
         Channel.CreateUnbounded<string>(new UnboundedChannelOptions { SingleReader = true });
+    private readonly Channel<(int Width, int Height)> _mediaDimensionsResponses =
+        Channel.CreateUnbounded<(int, int)>(new UnboundedChannelOptions { SingleReader = true });
 
     public SerialManager(string comPort, int baudRate)
     {
@@ -64,6 +69,8 @@ public class SerialManager
     public void Start()
     {
         _port.Open();
+        _port.DiscardInBuffer();
+        _port.DiscardOutBuffer();
     }
 
     public void Stop()
@@ -96,6 +103,45 @@ public class SerialManager
     {
         if (!_port.IsOpen) return;
         try { _port.WriteLine($"mute:knob{knobIndex + 1}:{(muted ? 1 : 0)}"); }
+        catch { }
+    }
+
+    // Explicit capability: firmware must not infer Discord from a display label.
+    public void SendDiscordMuteEnabled(int knobIndex, bool enabled)
+    {
+        if (!_port.IsOpen)
+            return;
+        try
+        {
+            _port.WriteLine($"cfg:discord:knob{knobIndex + 1}:{(enabled ? 1 : 0)}");
+        }
+        catch { }
+    }
+
+    public void SendDiscordStatus(int knobIndex, DiscordVoiceState state)
+    {
+        if (!_port.IsOpen)
+            return;
+        static int Value(bool? value) => value.HasValue ? (value.Value ? 1 : 0) : -1;
+        lock (_writeLock)
+        {
+            try
+            {
+                _port.WriteLine($"discord:knob{knobIndex + 1}:{Value(state.IsMuted)}:{Value(state.IsDeafened)}");
+            }
+            catch { }
+        }
+    }
+
+    public void SendChannelState(int knobIndex, float volume, bool muted)
+    {
+        if (!_port.IsOpen)
+            return;
+        try
+        {
+            var normalized = Math.Clamp(volume, 0f, 1f).ToString("F3", CultureInfo.InvariantCulture);
+            _port.WriteLine($"state:knob{knobIndex + 1}:{normalized}:{(muted ? 1 : 0)}");
+        }
         catch { }
     }
 
@@ -152,7 +198,7 @@ public class SerialManager
     /// higher char as '?'. Both localizations are ASCII today ("System"/"Sistema"), so
     /// nothing is lost — a non-ASCII label would need a firmware-side font change.
     /// </param>
-    public void SendAssignment(int knobIndex, string displayName, (byte R, byte G, byte B) color, byte[] iconRgb565)
+    public void SendAssignment(int knobIndex, string displayName, char kind, (byte R, byte G, byte B) color, byte[] iconRgb565)
     {
         if (!_port.IsOpen) return;
         try
@@ -160,7 +206,7 @@ public class SerialManager
             var knobId = $"knob{knobIndex + 1}";
             var hex = $"{color.R:X2}{color.G:X2}{color.B:X2}";
             var safeName = displayName.Replace("\r", "").Replace("\n", "");
-            _port.WriteLine($"assign:{knobId}:{hex}:{safeName}");
+            _port.WriteLine($"assign:{knobId}:{hex}:{kind}:{safeName}");
             if (iconRgb565.Length > 0)
                 _port.WriteLine($"icon:{knobId}:{Convert.ToBase64String(iconRgb565)}");
         }
@@ -243,6 +289,15 @@ public class SerialManager
 
     private void HandleCommand(string cmd)
     {
+        if (cmd.StartsWith("media:", StringComparison.Ordinal))
+        {
+            var dimensions = cmd.Split(':');
+            if (dimensions.Length == 3 && int.TryParse(dimensions[1], out var width) &&
+                int.TryParse(dimensions[2], out var height) &&
+                width > 0 && height > 0 && width <= 1024 && height <= 1024)
+                _mediaDimensionsResponses.Writer.TryWrite((width, height));
+            return;
+        }
         // GIF upload acknowledgements are consumed by UploadIdleGifAsync, not the
         // knob pipeline. Route them and stop.
         if (cmd.StartsWith("gif:", StringComparison.Ordinal))
@@ -279,7 +334,11 @@ public class SerialManager
             return;
         }
 
-        if (payload == "up")
+        if (payload == "discordmute")
+            DiscordMuteRequested?.Invoke(knobId);
+        else if (payload == "discorddeafen")
+            DiscordDeafenRequested?.Invoke(knobId);
+        else if (payload == "up")
             KnobDelta?.Invoke(knobId, +1);
         else if (payload == "down")
             KnobDelta?.Invoke(knobId, -1);
@@ -307,18 +366,40 @@ public class SerialManager
         catch (OperationCanceledException) when (!ct.IsCancellationRequested) { return null; } // timeout
     }
 
-    /// <summary>Bytes the controller has free for an idle GIF, or -1 if unknown.</summary>
+    /// <summary>Asks the connected firmware for its media size; old firmware keeps 240x240.</summary>
+    public async Task<(int Width, int Height)> QueryIdleMediaDimensionsAsync(CancellationToken ct = default)
+    {
+        if (!_port.IsOpen) return (240, 240);
+        while (_mediaDimensionsResponses.Reader.TryRead(out _)) { }
+        try { _port.WriteLine("media?"); } catch { return (240, 240); }
+        using var timeout = CancellationTokenSource.CreateLinkedTokenSource(ct);
+        timeout.CancelAfter(TimeSpan.FromSeconds(5));
+        try { return await _mediaDimensionsResponses.Reader.ReadAsync(timeout.Token).ConfigureAwait(false); }
+        catch (OperationCanceledException) when (!ct.IsCancellationRequested) { return (240, 240); }
+    }
+
+    /// <summary>Free bytes, -1 on communication/storage failure, or -2 while still calculating.</summary>
     public async Task<long> QueryIdleGifSpaceAsync(CancellationToken ct = default)
     {
         if (!_port.IsOpen) return -1;
-        DrainGifResponses();
-        try { _port.WriteLine("gif:space?"); } catch { return -1; }
-
-        var reply = await ReadGifResponseAsync(TimeSpan.FromSeconds(5), ct).ConfigureAwait(false);
-        if (reply != null && reply.StartsWith("gif:space:", StringComparison.Ordinal)
-            && long.TryParse(reply.AsSpan("gif:space:".Length), out var bytes))
-            return bytes;
-        return -1;
+        var started = System.Diagnostics.Stopwatch.StartNew();
+        do
+        {
+            ct.ThrowIfCancellationRequested();
+            DrainGifResponses();
+            try { _port.WriteLine("gif:space?"); } catch { return -1; }
+            var reply = await ReadGifResponseAsync(TimeSpan.FromSeconds(5), ct).ConfigureAwait(false);
+            if (reply == "gif:space:pending")
+            {
+                await Task.Delay(500, ct).ConfigureAwait(false);
+                continue;
+            }
+            if (reply != null && reply.StartsWith("gif:space:", StringComparison.Ordinal)
+                && long.TryParse(reply.AsSpan("gif:space:".Length), out var bytes))
+                return bytes;
+            return -1;
+        } while (started.Elapsed < TimeSpan.FromMinutes(5));
+        return -2;
     }
 
     /// <summary>
@@ -395,8 +476,14 @@ public class SerialManager
 
     private void WriteOrThrow(string line)
     {
-        try { _port.WriteLine(line); }
-        catch (Exception ex) { throw new IdleGifUploadException(Loc.Get("Gif_WriteFailed", ex.Message)); }
+        lock (_writeLock)
+        {
+            try
+            {
+                _port.WriteLine(line);
+            }
+            catch (Exception ex) { throw new IdleGifUploadException(Loc.Get("Gif_WriteFailed", ex.Message)); }
+        }
     }
 
     /// <summary>Removes the stored idle GIF so the controller reverts to its built-in animation.</summary>

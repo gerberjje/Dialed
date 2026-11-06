@@ -17,6 +17,10 @@ public static class SettingsService
             if (File.Exists(FilePath))
             {
                 var json = File.ReadAllText(FilePath);
+                // Preserve all old group members before single-app migration can be saved.
+                if (json.Contains("\"AppNames\"", StringComparison.Ordinal) &&
+                    !File.Exists(FilePath + ".before-single-app"))
+                    File.Copy(FilePath, FilePath + ".before-single-app");
                 var settings = JsonSerializer.Deserialize<AppSettings>(json);
                 if (settings != null)
                     return settings;

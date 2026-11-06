@@ -1,0 +1,8 @@
+bin/
+obj/
+tmp/
+.vs/
+.git/
+tools/esptool/
+Arduino/mixer/
+Arduino/mixer_nano/

@@ -28,3 +28,10 @@ BundleArtifacts/
 
 # Superpowers brainstorming session artifacts (local mockups)
 .superpowers/
+
+# Additional touch firmware descriptor
+/firmware/esp32/manifest-touch.json
+
+# Local scratch files, notes and validation artifacts
+/tmp/
+/debug.log

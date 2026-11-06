@@ -1,11 +1,15 @@
 name: Setup Arduino toolchain
 description: >
-  Installs arduino-cli with the pinned ESP32 core and TFT_eSPI, then overwrites the
-  library's User_Setup.h with Arduino/mixer/User_Setup.h so the GC9A01 pin mapping
-  matches the hardware. Shared by firmware.yml and release.yml so the compile check
+  Installs arduino-cli with the pinned ESP32 core, TFT_eSPI, and XPT2046_Touchscreen,
+  then applies the selected sketch hardware profile. Shared by
+  firmware.yml and release.yml so the compile check
   and the released binary are built with the same toolchain.
 
 inputs:
+  controller:
+    description: "Firmware selection: mixer (default) or touch."
+    required: false
+    default: "mixer"
   arduino-cli-version:
     description: >
       arduino-cli version. Pin a stable release, never a prerelease — this tool's
@@ -20,6 +24,10 @@ inputs:
     description: TFT_eSPI library version.
     required: false
     default: '2.5.43'
+  xpt2046-version:
+    description: XPT2046_Touchscreen library version.
+    required: false
+    default: "1.4.0"
 
 outputs:
   data-dir:
@@ -63,7 +71,7 @@ runs:
         path: |
           ${{ steps.dirs.outputs.data }}
           ${{ steps.dirs.outputs.user }}
-        key: arduino-${{ runner.os }}-cli${{ inputs.arduino-cli-version }}-core${{ inputs.core-version }}-tft${{ inputs.tft-espi-version }}-${{ hashFiles('Arduino/mixer/User_Setup.h') }}
+        key: arduino-${{ runner.os }}-cli${{ inputs.arduino-cli-version }}-core${{ inputs.core-version }}-tft${{ inputs.tft-espi-version }}-xpt${{ inputs.xpt2046-version }}-${{ hashFiles('Arduino/mixer/User_Setup.h') }}
 
     - name: Install ESP32 core
       shell: pwsh
@@ -93,13 +101,34 @@ runs:
         }
         if (-not (Test-Path $libDir)) { throw "TFT_eSPI not found at $libDir after install" }
 
-    # The stock library has no GC9A01 pin mapping; without this the sketch does not
-    # compile. Mirrors the manual step documented in Arduino/README.md.
+    - name: Install XPT2046_Touchscreen
+      if: inputs.controller == 'touch'
+      shell: pwsh
+      run: |
+        $libDir = Join-Path '${{ steps.dirs.outputs.user }}' 'libraries/XPT2046_Touchscreen'
+        if (Test-Path $libDir) {
+          Write-Host "XPT2046_Touchscreen already present (cache hit)"
+        } else {
+          arduino-cli lib install "XPT2046_Touchscreen@${{ inputs.xpt2046-version }}"
+          if ($LASTEXITCODE -ne 0) { throw "arduino-cli lib install failed" }
+        }
+        if (-not (Test-Path $libDir)) { throw "XPT2046_Touchscreen not found at $libDir after install" }
+
+    - name: Install FAT32 SD support
+      if: inputs.controller == 'touch'
+      shell: pwsh
+      run: |
+        arduino-cli lib install "SdFat@2.3.0"
+        if ($LASTEXITCODE -ne 0) { throw "SdFat install failed" }
+
+    # Apply the selected target profile: GC9A01 for mixer, ILI9341 for touch.
     - name: Apply the sketch's User_Setup.h to TFT_eSPI
       shell: pwsh
       run: |
+        if ('${{ inputs.controller }}' -notin @('mixer', 'touch')) { throw 'Unknown controller profile' }
         $target = Join-Path '${{ steps.dirs.outputs.user }}' 'libraries/TFT_eSPI/User_Setup.h'
-        $source = Join-Path $env:GITHUB_WORKSPACE 'Arduino/mixer/User_Setup.h'
+        $setupName = if ('${{ inputs.controller }}' -eq 'touch') { 'User_Setup_touch.h' } else { 'User_Setup.h' }
+        $source = Join-Path $env:GITHUB_WORKSPACE 'Arduino/mixer/$setupName'"
         if (-not (Test-Path $source)) { throw "Missing $source" }
         Copy-Item -Path $source -Destination $target -Force
         Write-Host "Applied User_Setup.h -> $target"
