@@ -128,7 +128,7 @@ runs:
         if ('${{ inputs.controller }}' -notin @('mixer', 'touch')) { throw 'Unknown controller profile' }
         $target = Join-Path '${{ steps.dirs.outputs.user }}' 'libraries/TFT_eSPI/User_Setup.h'
         $setupName = if ('${{ inputs.controller }}' -eq 'touch') { 'User_Setup_touch.h' } else { 'User_Setup.h' }
-        $source = Join-Path $env:GITHUB_WORKSPACE 'Arduino/mixer/$setupName'"
+        $source = Join-Path $env:GITHUB_WORKSPACE "Arduino/mixer/$setupName"
         if (-not (Test-Path $source)) { throw "Missing $source" }
         Copy-Item -Path $source -Destination $target -Force
         Write-Host "Applied User_Setup.h -> $target"
