@@ -1,8 +1,18 @@
-# Dialed
+# Dialed — mixer-touch
 
-> A hardware-controlled, per-application volume mixer for Windows.
+> The less tactile experience.
 
-Dialed pairs a small physical controller (an ESP32/Arduino with knobs or rotary
+**mixer-touch** is the touchscreen variant of Dialed. The current firmware targets
+an ESP32-2432S028-family board with an ILI9341 display and XPT2046 resistive touch
+controller. Other boards are not currently validated and may require hardware
+configuration changes or firmware porting. Select one of five channels, drag the volume arc,
+use the minus/plus buttons, or tap MUTE. Discord channels also offer microphone
+mute and deafen controls. The original knob-based firmware remains available.
+
+For touch-board setup, firmware builds and hardware details, see
+[`Arduino/README.md`](Arduino/README.md).
+
+The original Dialed pairs a small physical controller (an ESP32 with knobs or rotary
 encoders, a push switch, and a round display) with a Windows desktop app so you can
 set the volume of individual apps — Spotify, a game, your call — by turning a real
 knob, mute with a press, and flip your default output device with a switch. The
@@ -13,11 +23,11 @@ controller's round display shows the app icon and volume of whatever you're adju
 
 ## Features
 
-- Per-app **and** master volume control from physical knobs / rotary encoders
-- Mute an app with a knob press
+- Per-app **and** master volume control from touch controls or physical knobs / rotary encoders
+- Mute an app with a touch button or knob press
 - Switch the Windows default output device from a hardware switch (or in-app)
-- Live app icons + volume mirrored to the controller's round GC9A01 display
-- Idle-screen GIF library uploaded to the controller's flash
+- Live app icons + volume on the touch board's 320 x 240 display or the original round GC9A01
+- Idle-screen media stored on SD, with internal-flash fallback
 - Runs from the system tray; optional start-with-Windows
 - English and Portuguese (PT-PT) localization
 
@@ -53,12 +63,22 @@ connected before publishing.
 
 ## Hardware
 
-You need the companion controller: an ESP32 (or Arduino Nano variant) with
-potentiometers or rotary encoders, a push switch, and a round GC9A01 display,
-connected over USB serial. Wiring, the serial protocol, and the firmware sketches
-live in **[`Arduino/README.md`](Arduino/README.md)**.
+Connect a companion controller over USB serial:
+
+- **mixer-touch:** an ESP32-2432S028-family board with a 320 x 240 ILI9341 display
+  and XPT2046 resistive touch. No external knobs or output switch are required.
+- **Original mixer:** an ESP32 with potentiometers or rotary encoders, a push
+  switch, and a round GC9A01 display.
+
+Wiring, the serial protocol, and firmware instructions live in
+**[`Arduino/README.md`](Arduino/README.md)**. The touch-board sketch is
+`Arduino/mixer_touch`; `Arduino/mixer` retains the original upstream controller firmware.
 
 ## Installation
+
+For mixer-touch, build the app from this branch and flash `Arduino/mixer_touch`
+using the [firmware instructions](Arduino/README.md#build-and-flash). Published
+releases may not include this branch's touch and Discord support.
 
 1. Go to the [**Releases**](../../releases) page.
 2. Download the latest `Dialed-Setup-<version>-x64.exe`.
@@ -74,9 +94,14 @@ Requires 64-bit Windows 10 version 1809 (build 17763) or newer.
 
 1. Plug in the controller over USB.
 2. Launch Dialed; open **Settings** and pick the controller's COM port.
-3. On the mixer page, assign an app to each knob.
-4. Turn a knob to set that app's volume; press to mute; use the switch to change the
-   output device.
+3. For mixer-touch, set **Input type** to **Rotary encoder** and **Hardware controls**
+   to **5**. On the mixer page, assign an app to each channel.
+4. Tap a channel tab, then drag the volume arc or use minus/plus to adjust volume;
+   tap **MUTE** to toggle playback mute. On Discord channels, use the microphone
+   and headset icons for Discord mute/deafen. Change the output device in the app.
+
+With the original controller, turn a knob to set volume, press to mute, and use
+the hardware switch to change the output device.
 
 ## Build from source
 
@@ -135,3 +160,14 @@ Licensed under the **[PolyForm Noncommercial License 1.0.0](LICENSE)**. In short
 may use, modify, and share Dialed for any **non-commercial** purpose, but you may not
 sell it or use it for commercial advantage. See [`LICENSE`](LICENSE) for the full
 terms.
+
+## Formatting
+
+Shared defaults are in `.editorconfig`: spaces, UTF-8, LF line endings, a final newline,
+and a 100-column guideline. C# and XAML use four spaces; C++ and web files use two.
+
+Use `dotnet format whitespace Dialed.csproj --no-restore` for C#, `clang-format`
+with `.clang-format` for touch firmware, and Prettier with `.prettierrc.json` for
+HTML, embedded CSS/JavaScript, JSON and YAML. The prototypes are source files and
+should remain expanded, rather than minified. Preserve generated bitmap/font data
+and the restored upstream `mixer`/`mixer_nano` targets when doing bulk formatting.
