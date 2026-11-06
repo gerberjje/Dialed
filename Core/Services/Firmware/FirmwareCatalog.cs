@@ -23,16 +23,19 @@ public sealed class FirmwareCatalog
 
     public string Esp32BinPath(FirmwareManifest m) => Path.Combine(_baseDir, "firmware", "esp32", m.Bin);
 
-    /// <summary>The ESP32 flasher, or null if the bundled assets are missing/mismatched.</summary>
-    public IBoardFlasher? Esp32
+    /// <summary>The default mixer flasher, or null if assets are unavailable.</summary>
+    public IBoardFlasher? Esp32 => GetEsp32(false);
+
+    public IBoardFlasher? GetEsp32(bool touch)
     {
-        get
-        {
-            var manifest = Esp32Manifest;
-            if (manifest is null) return null;
-            var bin = Esp32BinPath(manifest);
-            if (!File.Exists(EsptoolPath) || !manifest.VerifyBin(bin)) return null;
-            return new Esp32Flasher(manifest, EsptoolPath, bin);
-        }
+        var path = touch
+            ? Path.Combine(_baseDir, "firmware", "esp32", "manifest-touch.json")
+            : Esp32ManifestPath;
+        var manifest = FirmwareManifest.TryLoad(path);
+        var board = touch ? "esp32-mixer-touch" : "esp32-mixer";
+        if (manifest is null || manifest.Board != board) return null;
+        var bin = Esp32BinPath(manifest);
+        if (!File.Exists(EsptoolPath) || !manifest.VerifyBin(bin)) return null;
+        return new Esp32Flasher(manifest, EsptoolPath, bin);
     }
 }

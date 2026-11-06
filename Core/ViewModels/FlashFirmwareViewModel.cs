@@ -17,18 +17,33 @@ public partial class FlashFirmwareViewModel : ObservableObject
     public FlashFirmwareViewModel(MainViewModel main)
     {
         _main = main;
+        selectedControllerIndex = main.IsTouchController ? 1 : 0;
     }
 
-    public string BoardName => _main.Esp32Flasher?.DisplayName ?? Loc.Get("Flash_Board_Esp32");
-    public string BundledVersionText => Loc.Get("Flash_Dialog_BundledVersion", _main.BundledFirmwareVersion ?? "—");
+    public string[] ControllerNames { get; } = { Loc.Get("Flash_Board_Esp32"), Loc.Get("Flash_Board_Esp32Touch") };
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(BoardName))]
+    [NotifyPropertyChangedFor(nameof(BundledVersionText))]
+    [NotifyPropertyChangedFor(nameof(CanFlash))]
+    [NotifyPropertyChangedFor(nameof(FirmwareUnavailable))]
+    private int selectedControllerIndex;
+
+    private IBoardFlasher? SelectedFlasher => _main.GetFirmwareFlasher(SelectedControllerIndex == 1);
+    public string BoardName => ControllerNames[SelectedControllerIndex == 1 ? 1 : 0];
+    public bool FirmwareUnavailable => SelectedFlasher is null;
+    public string BundledVersionText => Loc.Get("Flash_Dialog_BundledVersion", SelectedFlasher?.FirmwareVersion ?? "—");
     public string PortText => Loc.Get("Flash_Dialog_Port", string.IsNullOrWhiteSpace(_main.ComPort) ? "—" : _main.ComPort);
 
     /// <summary>True when a port is selected and firmware assets exist.</summary>
-    public bool CanFlash => !IsFlashing && _main.Esp32Flasher is not null && !string.IsNullOrWhiteSpace(_main.ComPort);
+    public bool CanFlash => !IsFlashing && SelectedFlasher is not null && !string.IsNullOrWhiteSpace(_main.ComPort);
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(CanFlash))]
+    [NotifyPropertyChangedFor(nameof(CanSelectController))]
     private bool isFlashing;
+
+    public bool CanSelectController => !IsFlashing;
 
     [ObservableProperty]
     private int percent;
@@ -67,7 +82,7 @@ public partial class FlashFirmwareViewModel : ObservableObject
 
         try
         {
-            await _main.FlashControllerAsync(progress, _cts.Token);
+            await _main.FlashControllerAsync(progress, _cts.Token, SelectedControllerIndex == 1);
             IsError = false;
             ResultMessage = Loc.Get("Flash_Success");
         }

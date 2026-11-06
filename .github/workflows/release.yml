@@ -56,19 +56,29 @@ jobs:
         shell: pwsh
         run: ./Arduino/tools/build-firmware.ps1
 
+      - name: Setup touch firmware toolchain
+        uses: ./.github/actions/setup-arduino
+        with:
+          controller: touch
+
+      - name: Build touch firmware
+        shell: pwsh
+        run: ./Arduino/tools/build-firmware.ps1 -Controller touch
+
       # A missing asset is NOT a build error: the csproj includes these
       # conditionally, so publish would succeed and ship an installer with no
       # flasher in it. Fail here instead.
       - name: Verify firmware assets
         shell: pwsh
         run: |
-          foreach ($f in @('tools/esptool/esptool.exe', 'firmware/esp32/manifest.json')) {
-            if (-not (Test-Path $f)) { throw "Missing expected firmware asset: $f" }
+          if (-not (Test-Path 'tools/esptool/esptool.exe')) { throw 'Missing esptool.exe' }
+          foreach ($name in @('manifest.json', 'manifest-touch.json')) {
+            $manifest = Get-Content "firmware/esp32/$name" -Raw | ConvertFrom-Json
+            $bin = Join-Path 'firmware/esp32' $manifest.bin
+            $sha = (Get-FileHash $bin -Algorithm SHA256).Hash.ToLowerInvariant()
+            if ($sha -ne $manifest.sha256) { throw "Invalid firmware hash: $name" }
+            Write-Host "Firmware: $($manifest.board) $($manifest.version)"
           }
-          $manifest = Get-Content 'firmware/esp32/manifest.json' -Raw | ConvertFrom-Json
-          $bin = Join-Path 'firmware/esp32' $manifest.bin
-          if (-not (Test-Path $bin)) { throw "manifest.json names '$($manifest.bin)' but it does not exist" }
-          Write-Host "Firmware: $($manifest.board) $($manifest.version) -> $($manifest.bin)"
 
       - name: Setup .NET
         uses: actions/setup-dotnet@v4
@@ -97,18 +107,14 @@ jobs:
         run: |
           $publish = 'bin/Release/net8.0-windows10.0.19041.0/win-x64/publish'
           $esptool = Join-Path $publish 'tools/esptool/esptool.exe'
-          $manifestPath = Join-Path $publish 'firmware/esp32/manifest.json'
-          foreach ($f in @($esptool, $manifestPath)) {
-            if (-not (Test-Path $f)) { throw "Missing from publish output: $f" }
+          if (-not (Test-Path $esptool)) { throw "Missing from publish output: $esptool" }
+          foreach ($name in @('manifest.json', 'manifest-touch.json')) {
+            $manifest = Get-Content (Join-Path $publish "firmware/esp32/$name") -Raw | ConvertFrom-Json
+            $bin = Join-Path $publish "firmware/esp32/$($manifest.bin)"
+            $sha = (Get-FileHash $bin -Algorithm SHA256).Hash.ToLowerInvariant()
+            if ($sha -ne $manifest.sha256) { throw "Invalid published firmware hash: $name" }
+            Write-Host "Publish output carries $($manifest.bin) (sha256 verified)"
           }
-          $manifest = Get-Content $manifestPath -Raw | ConvertFrom-Json
-          $bin = Join-Path $publish "firmware/esp32/$($manifest.bin)"
-          if (-not (Test-Path $bin)) { throw "Missing from publish output: $bin" }
-          $sha = (Get-FileHash -Algorithm SHA256 -Path $bin).Hash.ToLowerInvariant()
-          if ($sha -ne $manifest.sha256) {
-            throw "sha256 mismatch in publish output: manifest $($manifest.sha256), file $sha"
-          }
-          Write-Host "Publish output carries $($manifest.bin) (sha256 verified)"
 
       - name: Install Inno Setup
         run: choco install innosetup -y --no-progress

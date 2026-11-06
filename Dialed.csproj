@@ -66,6 +66,7 @@
     </Content>
     <Content Include="firmware\esp32\*.bin" CopyToOutputDirectory="PreserveNewest" />
     <Content Include="firmware\esp32\manifest.json" Condition="Exists('firmware\esp32\manifest.json')" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="firmware\esp32\manifest-touch.json" Condition="Exists('firmware\esp32\manifest-touch.json')" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
   <!-- Strings/<lang>/Resources.resw are auto-included as PRIResource by the SDK and

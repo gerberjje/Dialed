@@ -82,7 +82,8 @@ jobs:
           $compileArgs = @('compile', '--fqbn', 'esp32:esp32:esp32')
           $flags = '-DDIALED_CONTROLLER_TOUCH=0'
           if ('${{ matrix.controller }}' -eq 'touch') {
-            $flags = '-DDIALED_CONTROLLER_TOUCH=1 -DSPI_DRIVER_SELECT=2 -DMAINTAIN_FREE_CLUSTER_COUNT=1'
+            $setup = (Join-Path $env:GITHUB_WORKSPACE 'Arduino/mixer/User_Setup_touch.h').Replace('\', '/')
+            $flags = '-DDIALED_CONTROLLER_TOUCH=1 -DSPI_DRIVER_SELECT=2 -DMAINTAIN_FREE_CLUSTER_COUNT=1 -DUSER_SETUP_LOADED -include "' + $setup + '"'
           }
           $compileArgs += @('--build-property', "compiler.cpp.extra_flags=$flags")
           arduino-cli @compileArgs 'Arduino/mixer'

@@ -217,4 +217,6 @@
   <data name="Flash_Board_Esp32Touch" xml:space="preserve"><value>Controlador ESP32 com ecrã tátil</value></data>
   <data name="Flash_Err_ControllerMismatch" xml:space="preserve"><value>O controlador ligado indica {0}, mas o firmware incluído destina-se a {1}. Utilize um pacote de firmware para este controlador.</value></data>
   <data name="Gif_SpacePending" xml:space="preserve"><value>O espaço livre de armazenamento ainda está a ser calculado. Tente enviar novamente dentro de momentos.</value></data>
+  <data name="Flash_Dialog_Controller" xml:space="preserve"><value>Controlador</value></data>
+  <data name="Flash_Dialog_Unavailable" xml:space="preserve"><value>O firmware deste controlador não está disponível nesta instalação. Instale uma versão que inclua o respetivo firmware.</value></data>
 </root>

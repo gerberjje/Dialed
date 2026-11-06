@@ -99,3 +99,13 @@ and LED. Neither phase treats missing human observations as a pass.
 For fallback checks, unplug USB, remove the SD card, then reconnect USB and run
 Smoke with `-ExpectedStorage flash`. Power off before reinserting the card.
 Do not run the mixer profile on the touch board.
+
+### Firmware bundle selection
+
+```powershell
+dotnet run --project Arduino/tests/firmware/firmware-tests.csproj
+```
+
+Uses the desktop firmware catalog and manifests to check independent mixer/touch
+selection, missing assets, hash failures and incorrect board descriptors. It never
+runs esptool or flashes hardware. These checks remain local, like the other tests.

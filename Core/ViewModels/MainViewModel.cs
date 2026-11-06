@@ -55,6 +55,10 @@ public partial class MainViewModel : ObservableObject
     /// <summary>The ESP32 flasher (bundled firmware), or null if assets are missing.</summary>
     public IBoardFlasher? Esp32Flasher => _firmwareCatalog.Esp32;
 
+    public bool IsTouchController => _installedFirmwareBoard == "esp32-mixer-touch";
+
+    public IBoardFlasher? GetFirmwareFlasher(bool touch) => _firmwareCatalog.GetEsp32(touch);
+
     /// <summary>Bundled firmware version available to flash, or null if unavailable.</summary>
     public string? BundledFirmwareVersion => _firmwareCatalog.Esp32?.FirmwareVersion;
 
@@ -375,9 +379,9 @@ public partial class MainViewModel : ObservableObject
     /// (esptool needs exclusive access), then reconnects. Throws FlashException
     /// with a localized reason on failure.
     /// </summary>
-    public async Task FlashControllerAsync(IProgress<FlashProgress> progress, CancellationToken ct)
+    public async Task FlashControllerAsync(IProgress<FlashProgress> progress, CancellationToken ct, bool touch = false)
     {
-        var flasher = Esp32Flasher
+        var flasher = GetFirmwareFlasher(touch)
             ?? throw new FlashException(Loc.Get("Flash_Err_EsptoolMissing"));
 
         if (_serial.IsConnected && _installedFirmwareBoard is not null &&

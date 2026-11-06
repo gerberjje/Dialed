@@ -11,7 +11,13 @@
     IsPrimaryButtonEnabled="{x:Bind ViewModel.CanFlash, Mode=OneWay}">
 
     <StackPanel Spacing="12" MinWidth="360">
-        <TextBlock Text="{x:Bind ViewModel.BoardName, Mode=OneWay}" FontWeight="SemiBold" />
+        <ComboBox Header="{loc:Loc Key=Flash_Dialog_Controller}"
+                  ItemsSource="{x:Bind ViewModel.ControllerNames}"
+                  SelectedIndex="{x:Bind ViewModel.SelectedControllerIndex, Mode=TwoWay}"
+                  IsEnabled="{x:Bind ViewModel.CanSelectController, Mode=OneWay}" />
+        <InfoBar IsOpen="{x:Bind ViewModel.FirmwareUnavailable, Mode=OneWay}"
+                 IsClosable="False" Severity="Warning"
+                 Message="{loc:Loc Key=Flash_Dialog_Unavailable}" />
         <TextBlock Text="{x:Bind ViewModel.BundledVersionText, Mode=OneWay}" Opacity="0.8" />
         <TextBlock Text="{x:Bind ViewModel.PortText, Mode=OneWay}" Opacity="0.8" />
 

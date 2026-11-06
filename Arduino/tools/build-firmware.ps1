@@ -45,7 +45,10 @@ Copy-Item -LiteralPath (Join-Path $sketch $setupName) -Destination $tftSetup -Fo
 $compileArgs = @('compile', '--fqbn', 'esp32:esp32:esp32', '--output-dir', $buildDir)
 $flags = '-DDIALED_CONTROLLER_TOUCH=0'
 if ($Controller -eq 'touch') {
-  $flags = '-DDIALED_CONTROLLER_TOUCH=1 -DSPI_DRIVER_SELECT=2 -DMAINTAIN_FREE_CLUSTER_COUNT=1'
+  # Force the touch setup: Arduino also adds the sketch directory to the include path,
+  # where the original mixer User_Setup.h can shadow TFT_eSPI's library copy.
+  $setup = (Join-Path $sketch 'User_Setup_touch.h').Replace('\', '/')
+  $flags = '-DDIALED_CONTROLLER_TOUCH=1 -DSPI_DRIVER_SELECT=2 -DMAINTAIN_FREE_CLUSTER_COUNT=1 -DUSER_SETUP_LOADED -include "' + $setup + '"'
 }
 $compileArgs += @('--build-property', "compiler.cpp.extra_flags=$flags")
 arduino-cli @cliArgs @compileArgs $sketch
@@ -59,7 +62,7 @@ foreach ($f in @($appBin,$bootBin,$partBin)) {
 }
 
 # boot_app0.bin ships with the ESP32 Arduino core. Locate it under the arduino-cli data dir.
-$dataDir = (arduino-cli @cliArgs config get directories.data).Trim()
+$dataDir = (arduino-cli @cliArgs config get directories.data | Out-String).Trim()
 $bootApp0 = Get-ChildItem -Path $dataDir -Recurse -Filter 'boot_app0.bin' `
             -ErrorAction SilentlyContinue | Select-Object -First 1
 if (-not $bootApp0) { throw "boot_app0.bin not found under $dataDir (install esp32 core)" }
@@ -76,12 +79,9 @@ if ($LASTEXITCODE -ne 0) { throw "esptool merge-bin failed" }
 # 3. Write manifest.json (sha256 of the merged bin)
 $sha = (Get-FileHash -Algorithm SHA256 -Path $mergedBin).Hash.ToLowerInvariant()
 $manifest = [ordered]@{ board = $board; version = $version; bin = $binName; sha256 = $sha }
-# Touch adds its own descriptor; mixer retains the existing manifest.json.
-if ($Controller -eq 'touch') {
-  $profileManifestPath = Join-Path $outDir 'manifest-touch.json'
-  $manifest | ConvertTo-Json | Set-Content -Path $profileManifestPath -Encoding UTF8
-}
-$manifestPath = Join-Path $outDir 'manifest.json'
+# Each controller keeps its own descriptor; touch must never replace mixer.
+$manifestName = if ($Controller -eq 'touch') { 'manifest-touch.json' } else { 'manifest.json' }
+$manifestPath = Join-Path $outDir $manifestName
 $manifest | ConvertTo-Json | Set-Content -Path $manifestPath -Encoding UTF8
 
 Write-Host "Wrote $mergedBin"

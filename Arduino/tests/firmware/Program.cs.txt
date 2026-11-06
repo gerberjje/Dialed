@@ -1,0 +1,62 @@
+using System.Security.Cryptography;
+using System.Text.Json;
+using Dialed.Core.Services.Firmware;
+
+var root = Path.Combine(Path.GetTempPath(), "dialed-firmware-tests-" + Guid.NewGuid());
+var assets = Path.Combine(root, "firmware", "esp32");
+var tool = Path.Combine(root, "tools", "esptool", "esptool.exe");
+Directory.CreateDirectory(assets);
+Directory.CreateDirectory(Path.GetDirectoryName(tool)!);
+var checks = 0;
+void Check(bool condition, string message)
+{
+    if (!condition) throw new Exception(message);
+    checks++;
+}
+void Bundle(string name, string board)
+{
+    var bin = board + ".bin";
+    File.WriteAllBytes(Path.Combine(assets, bin), new byte[] { 1, 2, 3 });
+    var hash = Convert.ToHexString(SHA256.HashData(File.ReadAllBytes(Path.Combine(assets, bin))));
+    File.WriteAllText(Path.Combine(assets, name), JsonSerializer.Serialize(
+        new FirmwareManifest(board, "1.4.0", bin, hash)));
+}
+try
+{
+    var catalog = new FirmwareCatalog(root);
+    Check(catalog.Esp32 is null && catalog.GetEsp32(true) is null, "Missing bundles must disable flashing");
+    File.WriteAllText(tool, "test placeholder; never executed");
+    Bundle("manifest.json", "esp32-mixer");
+    Check(catalog.Esp32?.BoardId == "esp32-mixer", "Default must remain mixer");
+    Check(catalog.GetEsp32(true) is null, "Touch must never fall back to mixer");
+    Bundle("manifest-touch.json", "esp32-mixer-touch");
+    Check(catalog.GetEsp32(true)?.BoardId == "esp32-mixer-touch", "Touch bundle must resolve independently");
+    Check(catalog.Esp32?.BoardId == "esp32-mixer", "Adding touch must preserve mixer");
+    File.AppendAllText(Path.Combine(assets, "esp32-mixer-touch.bin"), "corrupt");
+    Check(catalog.GetEsp32(true) is null, "Invalid touch hash must disable flashing");
+    Check(catalog.Esp32 is not null, "Invalid touch must not disable mixer");
+    Bundle("manifest.json", "esp32-mixer-touch");
+    Check(catalog.Esp32 is null, "A touch manifest in the default slot must be rejected");
+    Bundle("manifest-touch.json", "esp32-mixer");
+    Check(catalog.GetEsp32(true) is null, "A mixer manifest in the touch slot must be rejected");
+    Bundle("manifest.json", "esp32-mixer");
+    File.Delete(tool);
+    Check(catalog.Esp32 is null, "Missing esptool must disable flashing");
+    if (args.Length > 0)
+    {
+        var bundled = new FirmwareCatalog(args[0]);
+        Check(bundled.Esp32?.BoardId == "esp32-mixer", "Packaged mixer bundle must load");
+        Check(bundled.GetEsp32(true)?.BoardId == "esp32-mixer-touch", "Packaged touch bundle must load");
+    }
+    Console.WriteLine($"Firmware catalog: {checks} checks passed; no device flashed.");
+}
+finally { Directory.Delete(root, recursive: true); }
+
+namespace Dialed.Core.Services
+{
+    // Resource loading needs WinUI; catalog tests only need deterministic labels.
+    internal static class Loc
+    {
+        public static string Get(string key, params object[] args) => key;
+    }
+}

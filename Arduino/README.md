@@ -241,6 +241,11 @@ it cannot detect a silent disconnect while USB power remains present.
 `screen:on` wakes it on PC resume/reconnect.
 There is no separate manual connected-screen-off toggle in the desktop UI.
 
+The desktop firmware dialog offers mixer and touch separately. To bundle both for a
+local desktop build, run `Arduino/tools/build-firmware.ps1` and then
+`Arduino/tools/build-firmware.ps1 -Controller touch` before building the desktop.
+The default `manifest.json` remains mixer; touch uses `manifest-touch.json`.
+
 ### Touch build and flash
 
 The current local touch board uses **COM6**. **COM4 is the Arduino Mini**; do not
@@ -250,14 +255,17 @@ Install the versions above and copy `mixer/User_Setup_touch.h` to the installed
 TFT_eSPI library directory. Run from the repository root:
 
 ```powershell
+$touchSetup = (Resolve-Path 'Arduino/mixer/User_Setup_touch.h').Path.Replace('\', '/')
+$touchFlags = '-DDIALED_CONTROLLER_TOUCH=1 -DSPI_DRIVER_SELECT=2 -DMAINTAIN_FREE_CLUSTER_COUNT=1 -DUSER_SETUP_LOADED -include "' + $touchSetup + '"'
 arduino-cli compile --fqbn esp32:esp32:esp32 `
-  --build-property "compiler.cpp.extra_flags=-DDIALED_CONTROLLER_TOUCH=1 -DSPI_DRIVER_SELECT=2 -DMAINTAIN_FREE_CLUSTER_COUNT=1" `
+  --build-property "compiler.cpp.extra_flags=$touchFlags" `
   Arduino/mixer
 
 arduino-cli upload --fqbn esp32:esp32:esp32 --port COM6 Arduino/mixer
 ```
 
-The SdFat flags must apply to the library as well as the sketch. Software SPI
+The explicit setup include prevents the original mixer configuration from shadowing
+the touch configuration. The SdFat flags must apply to the library as well as the sketch. Software SPI
 avoids reconfiguring the buses already used by display and touch. Cached free-space
 counting runs in bounded background steps under a shared filesystem lock. The
 first count can take time, but does not block touch input or serial processing.

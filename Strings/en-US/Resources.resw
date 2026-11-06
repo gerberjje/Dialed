@@ -217,4 +217,6 @@
   <data name="Flash_Board_Esp32Touch" xml:space="preserve"><value>ESP32 touchscreen controller</value></data>
   <data name="Flash_Err_ControllerMismatch" xml:space="preserve"><value>The connected controller reports {0}, but the bundled firmware targets {1}. Use a firmware bundle for this controller.</value></data>
   <data name="Gif_SpacePending" xml:space="preserve"><value>Storage free space is still being calculated. Please try uploading again shortly.</value></data>
+  <data name="Flash_Dialog_Controller" xml:space="preserve"><value>Controller</value></data>
+  <data name="Flash_Dialog_Unavailable" xml:space="preserve"><value>Firmware for this controller is unavailable in this install. Install a build that includes its firmware bundle.</value></data>
 </root>
